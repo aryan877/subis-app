@@ -1,15 +1,17 @@
-'use client'
+"use client";
 
-import { useState } from 'react';
-import { Contract } from 'zksync-ethers';
+import { useState } from "react";
+import { Contract } from "zksync-ethers";
 
-import { useAsync } from '../hooks/useAsync';
-import { erc20ABI, daiContractConfig } from './contracts'
-import { useEthereum } from './Context';
+import { useAsync } from "../hooks/useAsync";
+import { erc20ABI, daiContractConfig } from "./contracts";
+import { useEthereum } from "./Context";
 
 export function Token() {
   const { getProvider } = useEthereum();
-  const [tokenAddress, setTokenAddress] = useState<string>(daiContractConfig.address);
+  const [tokenAddress, setTokenAddress] = useState<string>(
+    daiContractConfig.address
+  );
 
   const fetchTokenData = async (address: string) => {
     const contract = new Contract(address, erc20ABI, getProvider()!);
@@ -27,12 +29,22 @@ export function Token() {
     };
   };
 
-  const { result: token, execute: fetchToken, inProgress, error } = useAsync(fetchTokenData);
+  const {
+    result: token,
+    execute: fetchToken,
+    inProgress,
+    error,
+  } = useAsync(fetchTokenData);
   const fetchCurrentToken = () => fetchToken(tokenAddress);
 
   return (
     <div>
-      <form onSubmit={(e) => { e.preventDefault(); fetchCurrentToken(); }}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          fetchCurrentToken();
+        }}
+      >
         <input
           value={tokenAddress}
           onChange={(e) => setTokenAddress(e.target.value)}

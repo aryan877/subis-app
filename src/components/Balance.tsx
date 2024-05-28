@@ -71,7 +71,7 @@ export function FindBalance() {
           <input
             type="text"
             placeholder="Wallet address"
-            className="input input-bordered"
+            className="input input-bordered mr-2"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
           />

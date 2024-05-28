@@ -10,10 +10,10 @@ function Page() {
   const { account } = useEthereum();
 
   return (
-    <main className="container mx-auto px-4 py-8">
+    <main className="container mx-auto px-4 py-8" data-theme="cmyk">
       {account.isConnected ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="card bg-base-100 shadow-xl">
+          <div className="card bg-base-100 border border-base-300">
             <div className="card-body">
               <h2 className="card-title">Network</h2>
               <p>
@@ -25,13 +25,13 @@ function Page() {
               </div>
             </div>
           </div>
-          <div className="card bg-base-100 shadow-xl">
+          <div className="card bg-base-100 border border-base-300">
             <div className="card-body">
               <h2 className="card-title">Balance</h2>
               <Balance />
             </div>
           </div>
-          <div className="card bg-primary text-primary-content">
+          <div className="card bg-cyan-600 text-cyan-content">
             <div className="card-body">
               <h2 className="card-title">Subscription Owner</h2>
               <p>
@@ -45,7 +45,7 @@ function Page() {
               </div>
             </div>
           </div>
-          <div className="card bg-secondary text-secondary-content">
+          <div className="card bg-yellow-500 text-yellow-content">
             <div className="card-body">
               <h2 className="card-title">Manage Subscriptions</h2>
               <p>View and manage your existing subscriptions.</p>
@@ -60,10 +60,10 @@ function Page() {
       ) : (
         <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
           <div className="text-center">
-            <h1 className="text-4xl md:text-6xl font-bold mb-6">
+            <h1 className="text-4xl md:text-6xl font-bold mb-6 text-cyan-600">
               Welcome to Subis
             </h1>
-            <p className="text-xl md:text-2xl mb-8">
+            <p className="text-xl md:text-2xl mb-8 text-base-content">
               Effortlessly manage your subscriptions in a decentralized manner
               with Subis
             </p>
@@ -71,9 +71,11 @@ function Page() {
               <Connect />
             </div>
             <div className="mt-12">
-              <h2 className="text-2xl md:text-3xl font-bold mb-4">Features</h2>
+              <h2 className="text-2xl md:text-3xl font-bold mb-4 text-cyan-600">
+                Features
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="bg-base-200 p-6 rounded-lg shadow-md">
+                <div className="bg-base-200 p-6 rounded-lg border border-base-300">
                   <div className="flex items-center justify-center mb-4">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -81,7 +83,7 @@ function Page() {
                       viewBox="0 0 24 24"
                       strokeWidth={1.5}
                       stroke="currentColor"
-                      className="w-12 h-12 text-primary"
+                      className="w-12 h-12 text-cyan-600"
                     >
                       <path
                         strokeLinecap="round"
@@ -90,13 +92,15 @@ function Page() {
                       />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold mb-2">Easy Setup</h3>
-                  <p>
+                  <h3 className="text-xl font-bold mb-2 text-cyan-600">
+                    Easy Setup
+                  </h3>
+                  <p className="text-base-content">
                     Set up your subscription plans effortlessly with our
                     user-friendly interface.
                   </p>
                 </div>
-                <div className="bg-base-200 p-6 rounded-lg shadow-md">
+                <div className="bg-base-200 p-6 rounded-lg border border-base-300">
                   <div className="flex items-center justify-center mb-4">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -104,7 +108,7 @@ function Page() {
                       viewBox="0 0 24 24"
                       strokeWidth={1.5}
                       stroke="currentColor"
-                      className="w-12 h-12 text-primary"
+                      className="w-12 h-12 text-cyan-600"
                     >
                       <path
                         strokeLinecap="round"
@@ -113,13 +117,15 @@ function Page() {
                       />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold mb-2">Automatic Payments</h3>
-                  <p>
+                  <h3 className="text-xl font-bold mb-2 text-cyan-600">
+                    Automatic Payments
+                  </h3>
+                  <p className="text-base-content">
                     Collect payments from user smart contracts automatically,
                     ensuring timely and reliable revenue.
                   </p>
                 </div>
-                <div className="bg-base-200 p-6 rounded-lg shadow-md">
+                <div className="bg-base-200 p-6 rounded-lg border border-base-300">
                   <div className="flex items-center justify-center mb-4">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -127,7 +133,7 @@ function Page() {
                       viewBox="0 0 24 24"
                       strokeWidth={1.5}
                       stroke="currentColor"
-                      className="w-12 h-12 text-primary"
+                      className="w-12 h-12 text-cyan-600"
                     >
                       <path
                         strokeLinecap="round"
@@ -136,10 +142,10 @@ function Page() {
                       />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold mb-2">
+                  <h3 className="text-xl font-bold mb-2 text-cyan-600">
                     Subscription Management
                   </h3>
-                  <p>
+                  <p className="text-base-content">
                     Manage your subscriptions easily, view analytics, and make
                     informed decisions to grow your business.
                   </p>
