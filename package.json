@@ -15,12 +15,14 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-spinners": "^0.13.8",
+    "uuid": "^9.0.1",
     "zksync-ethers": "^6.0.0"
   },
   "devDependencies": {
     "@types/node": "^17.0.31",
     "@types/react": "^18.0.9",
     "@types/react-dom": "^18.0.3",
+    "@types/uuid": "^9.0.8",
     "autoprefixer": "^10.4.19",
     "daisyui": "^4.11.1",
     "eslint": "^8.15.0",

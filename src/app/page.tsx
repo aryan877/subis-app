@@ -5,6 +5,7 @@ import { NetworkSwitcher } from "../components/NetworkSwitcher";
 import { Balance } from "../components/Balance";
 import Link from "next/link";
 import { Connect } from "../components/Connect";
+import { Check, DollarSign, Sliders } from "lucide-react";
 
 function Page() {
   const { account } = useEthereum();
@@ -13,7 +14,7 @@ function Page() {
     <main className="container mx-auto px-4 py-8" data-theme="cmyk">
       {account.isConnected ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="card bg-base-100 border border-base-300">
+          <div className="card bg-base-100 border border-base-300 shadow-xl">
             <div className="card-body">
               <h2 className="card-title">Network</h2>
               <p>
@@ -25,13 +26,13 @@ function Page() {
               </div>
             </div>
           </div>
-          <div className="card bg-base-100 border border-base-300">
+          <div className="card bg-base-100 border border-base-300 shadow-xl">
             <div className="card-body">
               <h2 className="card-title">Balance</h2>
               <Balance />
             </div>
           </div>
-          <div className="card bg-cyan-600 text-cyan-content">
+          <div className="card bg-cyan-600 text-cyan-content shadow-xl">
             <div className="card-body">
               <h2 className="card-title">Subscription Owner</h2>
               <p>
@@ -45,7 +46,7 @@ function Page() {
               </div>
             </div>
           </div>
-          <div className="card bg-yellow-500 text-yellow-content">
+          <div className="card bg-yellow-500 text-yellow-content shadow-xl">
             <div className="card-body">
               <h2 className="card-title">Manage Subscriptions</h2>
               <p>View and manage your existing subscriptions.</p>
@@ -75,80 +76,45 @@ function Page() {
                 Features
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="bg-base-200 p-6 rounded-lg border border-base-300">
-                  <div className="flex items-center justify-center mb-4">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={1.5}
-                      stroke="currentColor"
-                      className="w-12 h-12 text-cyan-600"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"
-                      />
-                    </svg>
+                <div className="card bg-base-200 shadow-xl">
+                  <figure className="px-10 pt-10">
+                    <Check className="w-12 h-12 text-cyan-600" />
+                  </figure>
+                  <div className="card-body items-center text-center">
+                    <h3 className="card-title text-cyan-600">Easy Setup</h3>
+                    <p>
+                      Set up your subscription plans effortlessly with our
+                      user-friendly interface.
+                    </p>
                   </div>
-                  <h3 className="text-xl font-bold mb-2 text-cyan-600">
-                    Easy Setup
-                  </h3>
-                  <p className="text-base-content">
-                    Set up your subscription plans effortlessly with our
-                    user-friendly interface.
-                  </p>
                 </div>
-                <div className="bg-base-200 p-6 rounded-lg border border-base-300">
-                  <div className="flex items-center justify-center mb-4">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={1.5}
-                      stroke="currentColor"
-                      className="w-12 h-12 text-cyan-600"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
+                <div className="card bg-base-200 shadow-xl">
+                  <figure className="px-10 pt-10">
+                    <DollarSign className="w-12 h-12 text-cyan-600" />
+                  </figure>
+                  <div className="card-body items-center text-center">
+                    <h3 className="card-title text-cyan-600">
+                      Automatic Payments
+                    </h3>
+                    <p>
+                      Collect payments from user smart contracts automatically,
+                      ensuring timely and reliable revenue.
+                    </p>
                   </div>
-                  <h3 className="text-xl font-bold mb-2 text-cyan-600">
-                    Automatic Payments
-                  </h3>
-                  <p className="text-base-content">
-                    Collect payments from user smart contracts automatically,
-                    ensuring timely and reliable revenue.
-                  </p>
                 </div>
-                <div className="bg-base-200 p-6 rounded-lg border border-base-300">
-                  <div className="flex items-center justify-center mb-4">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={1.5}
-                      stroke="currentColor"
-                      className="w-12 h-12 text-cyan-600"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"
-                      />
-                    </svg>
+                <div className="card bg-base-200 shadow-xl">
+                  <figure className="px-10 pt-10">
+                    <Sliders className="w-12 h-12 text-cyan-600" />
+                  </figure>
+                  <div className="card-body items-center text-center">
+                    <h3 className="card-title text-cyan-600">
+                      Subscription Management
+                    </h3>
+                    <p>
+                      Manage your subscriptions easily, view analytics, and make
+                      informed decisions to grow your business.
+                    </p>
                   </div>
-                  <h3 className="text-xl font-bold mb-2 text-cyan-600">
-                    Subscription Management
-                  </h3>
-                  <p className="text-base-content">
-                    Manage your subscriptions easily, view analytics, and make
-                    informed decisions to grow your business.
-                  </p>
                 </div>
               </div>
             </div>

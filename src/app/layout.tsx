@@ -2,6 +2,7 @@ import { EthereumProvider } from "../components/Context";
 import { Connect } from "../components/Connect";
 import Link from "next/link";
 import "../global.css";
+import { ToastProvider } from "../context/ToastProvider";
 
 export const metadata = {
   title: "Subis",
@@ -45,9 +46,11 @@ export default function RootLayout({
                 </div>
               </nav>
             </header>
-            <main className="flex-1 container mx-auto py-8 px-4">
-              {children}
-            </main>
+            <ToastProvider>
+              <main className="flex-1 container mx-auto py-8 px-4">
+                {children}
+              </main>
+            </ToastProvider>
             <footer className="bg-base-200 py-4">
               <div className="container mx-auto text-center">
                 <p>&copy; 2023 Subis. All rights reserved.</p>

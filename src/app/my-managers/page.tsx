@@ -8,6 +8,7 @@ import { BackButton } from "../../components/BackButton";
 import { useRouter } from "next/navigation";
 import { Copy, ExternalLink, CreditCard } from "lucide-react";
 import { BeatLoader } from "react-spinners";
+import { useToast } from "../../context/ToastProvider";
 
 function MyManagers() {
   const [managers, setManagers] = useState<string[]>([]);
@@ -26,6 +27,7 @@ function MyManagers() {
   const [copyStatus, setCopyStatus] = useState<{ [key: string]: boolean }>({});
   const { getSigner, getProvider } = useEthereum();
   const router = useRouter();
+  const { showToast } = useToast();
   useEffect(() => {
     const fetchManagers = async () => {
       setIsLoading(true);
@@ -139,6 +141,10 @@ function MyManagers() {
       ...prevStatus,
       [address]: true,
     }));
+    showToast({
+      type: "success",
+      message: "Address copied successfully!",
+    });
     setTimeout(() => {
       setCopyStatus((prevStatus) => ({
         ...prevStatus,
