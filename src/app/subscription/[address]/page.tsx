@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { ethers } from "ethers";
-import { Contract, types, EIP712Signer, utils } from "zksync-ethers";
+import { Contract } from "zksync-ethers";
 import { useEthereum } from "../../../components/Context";
 import SubscriptionManagerArtifact from "../../../../artifacts-zk/contracts/SubscriptionManager.sol/SubscriptionManager.json";
 import AAFactoryArtifact from "../../../../artifacts-zk/contracts/AAFactory.sol/AAFactory.json";
@@ -12,7 +12,20 @@ import { BeatLoader } from "react-spinners";
 import { useToast } from "../../../context/ToastProvider";
 import { Plan } from "../../../../interfaces/Plan";
 import { Modal } from "../../../components/Modal";
-import { Copy } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle,
+  Copy,
+  CreditCard,
+  XCircle,
+} from "lucide-react";
+import UserFacingPlanCard from "./component/UserFacingPlanCard";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 function SubscriptionPage() {
   const params = useParams<{ address: string }>();
@@ -25,13 +38,8 @@ function SubscriptionPage() {
     string | null
   >(null);
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isFunding, setIsFunding] = useState<boolean>(false);
-  const [isSubscribing, setIsSubscribing] = useState<boolean>(false);
-  const [isUnsubscribing, setIsUnsubscribing] = useState<boolean>(false);
-  const [isStartingSubscription, setIsStartingSubscription] =
-    useState<boolean>(false);
   const [isDeploying, setIsDeploying] = useState<boolean>(false);
   const [isSettingSpendingLimit, setIsSettingSpendingLimit] =
     useState<boolean>(false);
@@ -40,6 +48,8 @@ function SubscriptionPage() {
   const [spendingLimitAmount, setSpendingLimitAmount] = useState<string>("");
   const [signerAddress, setSignerAddress] = useState<string>("");
   const [isPaymasterEnabled, setIsPaymasterEnabled] = useState<boolean>(false);
+  const [showFundingModal, setShowFundingModal] = useState<boolean>(false);
+  const [fundingAmount, setFundingAmount] = useState<string>("");
   const [showDeployModal, setShowDeployModal] = useState<boolean>(false);
   const [showSpendingLimitModal, setShowSpendingLimitModal] =
     useState<boolean>(false);
@@ -48,7 +58,10 @@ function SubscriptionPage() {
   const [subscriptionAccountBalance, setSubscriptionAccountBalance] =
     useState<string>("0");
   const [paymasterAddress, setPaymasterAddress] = useState<string>("");
+  const [currentPlan, setCurrentPlan] = useState<Plan | null>(null);
   const { getSigner, getProvider } = useEthereum();
+  const [subscriptionAccountBalanceUSD, setSubscriptionAccountBalanceUSD] =
+    useState<string>("0");
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -91,11 +104,14 @@ function SubscriptionPage() {
           setSubscriptionAccountAddress(address);
 
           const provider = getProvider();
-          const balance = await provider!.getBalance(address);
-          setSubscriptionAccountBalance(ethers.formatEther(balance));
+          const balance = await fetchSubscriptionAccountBalance(
+            provider!,
+            address
+          );
+          setSubscriptionAccountBalance(balance);
         }
 
-        await fetchPlans(subscriptionManager);
+        await fetchPlans(subscriptionManager, subscriptionAccountAddress);
         setIsLoading(false);
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -106,50 +122,64 @@ function SubscriptionPage() {
     fetchData();
   }, [managerAddress, getSigner]);
 
-  const fetchPlans = async (subscriptionManager: Contract) => {
+  const fetchPlans = async (
+    subscriptionManager: Contract,
+    subscriptionAccountAddress: string | null
+  ) => {
     try {
       const livePlans: Plan[] = await subscriptionManager.getLivePlans();
       const updatedPlans: Plan[] = await Promise.all(
-        livePlans.map(async (plan, index) => ({
-          id: index,
-          name: plan.name,
-          feeUSD: ethers.formatUnits(plan.feeUSD, 8),
-          feeETH: parseFloat(
-            ethers.formatUnits(
-              await subscriptionManager.convertUSDtoETH(plan.feeUSD),
-              18
-            )
-          ).toFixed(6),
-          exists: plan.exists,
-          isLive: plan.isLive,
-          subscriberCount: Number(
-            await subscriptionManager.getSubscriberCount(index)
-          ),
-        }))
+        livePlans.map(async (plan) => {
+          const subscriptionDetails = subscriptionAccountAddress
+            ? await subscriptionManager.subscriptions(
+                subscriptionAccountAddress
+              )
+            : null;
+
+          const isSubscribed = subscriptionDetails
+            ? subscriptionDetails.planId === plan.planId
+            : false;
+
+          const isActive = subscriptionDetails
+            ? subscriptionDetails.isActive
+            : false;
+
+          const nextPaymentTimestamp = subscriptionDetails
+            ? dayjs(Number(subscriptionDetails.nextPaymentTimestamp) * 1000)
+                .local()
+                .format("MMMM D, YYYY h:mm:ss A")
+            : "";
+
+          const updatedPlan: Plan = {
+            planId: plan.planId,
+            name: plan.name,
+            feeUSD: ethers.formatUnits(plan.feeUSD, 8),
+            feeETH: parseFloat(
+              ethers.formatUnits(
+                await subscriptionManager.convertUSDtoETH(plan.feeUSD),
+                18
+              )
+            ).toFixed(6),
+            exists: plan.exists,
+            isLive: plan.isLive,
+            subscriberCount: Number(
+              await subscriptionManager.getSubscriberCount(plan.planId)
+            ),
+            isSubscribed,
+            isActive,
+            nextPaymentTimestamp,
+          };
+
+          if (isSubscribed && isActive) {
+            setCurrentPlan(updatedPlan);
+          }
+
+          return updatedPlan;
+        })
       );
       setPlans(updatedPlans);
-      await checkSubscriptionStatus(subscriptionManager);
     } catch (error) {
       console.error("Error fetching plans:", error);
-    }
-  };
-
-  const checkSubscriptionStatus = async (subscriptionManager: Contract) => {
-    try {
-      const isSubscribed = await subscriptionManager.isSubscriptionActive(
-        signerAddress
-      );
-      if (isSubscribed) {
-        const planId = await subscriptionManager.getSubscriberPlan(
-          signerAddress
-        );
-        const plan = plans.find((plan) => plan.id === planId);
-        if (plan) {
-          setSelectedPlan(plan);
-        }
-      }
-    } catch (error) {
-      console.error("Error checking subscription status:", error);
     }
   };
 
@@ -162,7 +192,6 @@ function SubscriptionPage() {
         AAFactoryArtifact.abi,
         signer!
       );
-
       const salt = ethers.id(signerAddress);
       const tx = await aaFactory.deployAccount(
         salt,
@@ -210,13 +239,21 @@ function SubscriptionPage() {
     }
   };
 
-  const fundWallet = async () => {
+  const fetchSubscriptionAccountBalance = async (
+    provider: ethers.Provider,
+    subscriptionAccountAddress: string
+  ) => {
+    const balance = await provider.getBalance(subscriptionAccountAddress);
+    return parseFloat(ethers.formatEther(balance)).toFixed(4);
+  };
+
+  const handleFundWallet = async () => {
     try {
       setIsFunding(true);
       const signer = await getSigner();
       const tx = await signer!.sendTransaction({
         to: subscriptionAccountAddress!,
-        value: ethers.parseEther("1"),
+        value: ethers.parseEther(fundingAmount),
       });
 
       showToast({
@@ -227,11 +264,20 @@ function SubscriptionPage() {
 
       await tx.wait();
 
+      const provider = getProvider();
+      const balance = await fetchSubscriptionAccountBalance(
+        provider!,
+        subscriptionAccountAddress!
+      );
+      setSubscriptionAccountBalance(balance);
       showToast({
         type: "success",
         message: "Wallet funded successfully!",
         transactionHash: tx.hash,
       });
+
+      setFundingAmount("");
+      setShowFundingModal(false);
     } catch (error) {
       console.error("Error funding wallet:", error);
       showToast({
@@ -243,229 +289,23 @@ function SubscriptionPage() {
     }
   };
 
-  const subscribe = async () => {
-    try {
-      setIsSubscribing(true);
-      const signer = await getSigner();
-      const provider = getProvider();
-      const subscriptionAccountAddress =
-        await subscriptionAccount!.getAddress();
+  useEffect(() => {
+    const updateSubscriptionAccountBalanceUSD = async () => {
+      if (subscriptionManager) {
+        try {
+          const balanceWei = ethers.parseEther(subscriptionAccountBalance);
+          const balanceUSD = await subscriptionManager.convertETHtoUSD(
+            balanceWei
+          );
+          setSubscriptionAccountBalanceUSD(ethers.formatUnits(balanceUSD, 8));
+        } catch (error) {
+          console.error("Error converting balance to USD:", error);
+        }
+      }
+    };
 
-      let subscribeTx =
-        await subscriptionManager!.subscribe.populateTransaction(
-          selectedPlan!.id
-        );
-
-      const paymasterParams = isPaymasterEnabled
-        ? utils.getPaymasterParams(await subscriptionManager!.paymaster(), {
-            type: "General",
-            innerInput: new Uint8Array(),
-          })
-        : undefined;
-
-      subscribeTx = {
-        ...subscribeTx,
-        from: subscriptionAccountAddress,
-        chainId: (await provider!.getNetwork()).chainId,
-        nonce: await provider!.getTransactionCount(subscriptionAccountAddress),
-        type: utils.EIP712_TX_TYPE,
-        customData: {
-          gasPerPubdata: utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
-          ...(paymasterParams && { paymasterParams }),
-        } as types.Eip712Meta,
-        value: ethers.getBigInt(0),
-      };
-
-      subscribeTx.gasPrice = await provider!.getGasPrice();
-      subscribeTx.gasLimit = await provider!.estimateGas(subscribeTx);
-
-      const eip712Signer = new EIP712Signer(
-        signer!,
-        Number(subscribeTx.chainId)
-      );
-      const signedTx = await eip712Signer.sign(subscribeTx);
-
-      subscribeTx.customData = {
-        ...subscribeTx.customData,
-        customSignature: signedTx,
-      };
-
-      showToast({
-        type: "info",
-        message: "Subscribing to plan...",
-      });
-
-      const sentTx = await provider!.broadcastTransaction(
-        utils.serializeEip712(subscribeTx)
-      );
-
-      await sentTx?.wait();
-
-      showToast({
-        type: "success",
-        message: "Subscribed to plan successfully!",
-        transactionHash: sentTx!.hash,
-      });
-
-      await fetchPlans(subscriptionManager!);
-    } catch (error) {
-      console.error("Error subscribing to plan:", error);
-      showToast({
-        type: "error",
-        message: "Error subscribing to plan. Please try again.",
-      });
-    } finally {
-      setIsSubscribing(false);
-    }
-  };
-
-  const unsubscribe = async () => {
-    try {
-      setIsUnsubscribing(true);
-      const signer = await getSigner();
-      const provider = getProvider()!;
-
-      let unsubscribeTx =
-        await subscriptionManager!.unsubscribe.populateTransaction();
-
-      const paymasterParams = isPaymasterEnabled
-        ? utils.getPaymasterParams(await subscriptionManager!.paymaster(), {
-            type: "General",
-            innerInput: new Uint8Array(),
-          })
-        : undefined;
-
-      unsubscribeTx = {
-        ...unsubscribeTx,
-        from: subscriptionAccountAddress!,
-        chainId: (await provider.getNetwork()).chainId,
-        nonce: await provider.getTransactionCount(subscriptionAccountAddress!),
-        type: utils.EIP712_TX_TYPE,
-        customData: {
-          gasPerPubdata: utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
-          ...(paymasterParams && { paymasterParams }),
-        } as types.Eip712Meta,
-        value: ethers.getBigInt(0),
-      };
-
-      unsubscribeTx.gasPrice = await provider.getGasPrice();
-      unsubscribeTx.gasLimit = await provider.estimateGas(unsubscribeTx);
-
-      const eip712Signer = new EIP712Signer(
-        signer!,
-        Number(unsubscribeTx.chainId)
-      );
-      const signedTx = await eip712Signer.sign(unsubscribeTx);
-
-      unsubscribeTx.customData = {
-        ...unsubscribeTx.customData,
-        customSignature: signedTx,
-      };
-
-      showToast({
-        type: "info",
-        message: "Unsubscribing from plan...",
-      });
-
-      const sentTx = await provider.broadcastTransaction(
-        utils.serializeEip712(unsubscribeTx)
-      );
-
-      await sentTx.wait();
-
-      showToast({
-        type: "success",
-        message: "Unsubscribed from plan successfully!",
-        transactionHash: sentTx.hash,
-      });
-
-      await fetchPlans(subscriptionManager!);
-    } catch (error) {
-      console.error("Error unsubscribing from plan:", error);
-      showToast({
-        type: "error",
-        message: "Error unsubscribing from plan. Please try again.",
-      });
-    } finally {
-      setIsUnsubscribing(false);
-    }
-  };
-
-  const startSubscription = async () => {
-    try {
-      setIsStartingSubscription(true);
-      const signer = await getSigner();
-      const provider = getProvider()!;
-
-      let startSubscriptionTx =
-        await subscriptionManager!.startSubscription.populateTransaction(
-          selectedPlan!.id
-        );
-
-      const paymasterParams = isPaymasterEnabled
-        ? utils.getPaymasterParams(await subscriptionManager!.paymaster(), {
-            type: "General",
-            innerInput: new Uint8Array(),
-          })
-        : undefined;
-
-      startSubscriptionTx = {
-        ...startSubscriptionTx,
-        from: subscriptionAccountAddress!,
-        chainId: (await provider.getNetwork()).chainId,
-        nonce: await provider.getTransactionCount(subscriptionAccountAddress!),
-        type: utils.EIP712_TX_TYPE,
-        customData: {
-          gasPerPubdata: utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
-          ...(paymasterParams && { paymasterParams }),
-        } as types.Eip712Meta,
-        value: ethers.getBigInt(0),
-      };
-
-      startSubscriptionTx.gasPrice = await provider.getGasPrice();
-      startSubscriptionTx.gasLimit = await provider.estimateGas(
-        startSubscriptionTx
-      );
-
-      const eip712Signer = new EIP712Signer(
-        signer!,
-        Number(startSubscriptionTx.chainId)
-      );
-      const signedTx = await eip712Signer.sign(startSubscriptionTx);
-
-      startSubscriptionTx.customData = {
-        ...startSubscriptionTx.customData,
-        customSignature: signedTx,
-      };
-
-      showToast({
-        type: "info",
-        message: "Starting subscription...",
-      });
-
-      const sentTx = await provider.broadcastTransaction(
-        utils.serializeEip712(startSubscriptionTx)
-      );
-
-      await sentTx.wait();
-
-      showToast({
-        type: "success",
-        message: "Subscription started successfully!",
-        transactionHash: sentTx.hash,
-      });
-
-      await fetchPlans(subscriptionManager!);
-    } catch (error) {
-      console.error("Error starting subscription:", error);
-      showToast({
-        type: "error",
-        message: "Error starting subscription. Please try again.",
-      });
-    } finally {
-      setIsStartingSubscription(false);
-    }
-  };
+    updateSubscriptionAccountBalanceUSD();
+  }, [subscriptionAccountBalance, subscriptionManager]);
 
   const setSpendingLimit = async () => {
     try {
@@ -476,6 +316,7 @@ function SubscriptionPage() {
         ethers.parseEther(spendingLimitAmount),
         signer
       );
+
       showToast({
         type: "info",
         message: "Setting spending limit...",
@@ -512,6 +353,7 @@ function SubscriptionPage() {
         ethers.parseEther(spendingLimitAmount),
         signer
       );
+
       showToast({
         type: "info",
         message: "Updating spending limit...",
@@ -549,101 +391,164 @@ function SubscriptionPage() {
 
   return (
     <div className="flex flex-col items-center justify-center py-8">
-      <BackButton />
       <h1 className="text-4xl font-bold mb-8">Subscription Page</h1>
+
       {isLoading ? (
         <div className="flex justify-center items-center h-64">
           <BeatLoader size={12} color="#4B5563" />
         </div>
       ) : (
-        <div className="w-full max-w-6xl px-4">
+        <div className="w-full max-w-7xl px-4">
+          <BackButton />
           <div className="bg-white border border-gray-300 rounded-lg p-6 mb-8">
-            <h2 className="text-2xl font-semibold mb-4">Smart Wallet</h2>
+            <h2 className="text-2xl font-semibold mb-4 flex items-center">
+              <CreditCard className="w-6 h-6 mr-2" />
+              Smart Wallet
+            </h2>
             {subscriptionAccount ? (
-              <div>
-                <p className="mb-2">
-                  <span className="font-semibold">Subscription Account:</span>{" "}
-                  {subscriptionAccountAddress
-                    ? `${subscriptionAccountAddress.slice(
-                        0,
-                        6
-                      )}...${subscriptionAccountAddress.slice(-4)}`
-                    : "N/A"}
-                  <button
-                    className="btn btn-ghost btn-xs ml-2"
-                    onClick={() =>
-                      handleCopyAddress(subscriptionAccountAddress || "")
-                    }
-                  >
-                    <Copy className="w-4 h-4" />
-                  </button>
-                </p>
-                <p className="mb-2">
-                  <span className="font-semibold">Account Balance:</span>{" "}
-                  {subscriptionAccountBalance} ETH
-                </p>
-                <p className="mb-2">
-                  <span className="font-semibold">Paymaster Address:</span>{" "}
-                  {paymasterAddress
-                    ? `${paymasterAddress.slice(
-                        0,
-                        6
-                      )}...${paymasterAddress.slice(-4)}`
-                    : "N/A"}
-                  <button
-                    className="btn btn-ghost btn-xs ml-2"
-                    onClick={() => handleCopyAddress(paymasterAddress)}
-                  >
-                    <Copy className="w-4 h-4" />
-                  </button>
-                </p>
-                {isPaymasterEnabled ? (
-                  <p className="text-green-800 bg-green-200 border border-green-600 p-4 rounded-md shadow-sm">
-                    <strong>Notice:</strong> The paymaster covers gas fees{" "}
-                    <strong>only</strong> for transactions interacting with the
-                    Subscription Manager contract. Users must cover fees for all
-                    other transactions, including subscription costs.
-                  </p>
-                ) : (
-                  <p className="text-red-800 bg-red-200 border border-red-600 p-4 rounded-md shadow-sm">
-                    <strong>Alert:</strong> No paymaster attached. Please fund
-                    the subscription smart wallet account to perform
-                    transactions.
-                  </p>
-                )}
-                <div className="flex flex-col space-y-4 mt-4">
-                  <button
-                    className={`btn btn-primary`}
-                    onClick={fundWallet}
-                    disabled={isFunding}
-                  >
-                    Fund Wallet
-                  </button>
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => setShowSpendingLimitModal(true)}
-                  >
-                    Set Spending Limit
-                  </button>
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => setShowUpdateSpendingLimitModal(true)}
-                  >
-                    Update Spending Limit
-                  </button>
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="stats stats-vertical">
+                    <div className="stat">
+                      <div className="stat-title">Subscription Account</div>
+                      <div className="stat-value truncate">
+                        {subscriptionAccountAddress || "N/A"}
+                      </div>
+                      <div className="stat-actions">
+                        <button
+                          className="btn btn-sm btn-ghost shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+                          onClick={() =>
+                            handleCopyAddress(subscriptionAccountAddress || "")
+                          }
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="stat">
+                      <div className="stat-title">Account Balance</div>
+                      <div className="stat-value">
+                        {subscriptionAccountBalance} ETH
+                        <span className="text-gray-500 text-sm ml-2">
+                          (${subscriptionAccountBalanceUSD} USD)
+                        </span>
+                      </div>
+                    </div>
+                    <div className="stat">
+                      <div className="stat-title">Paymaster Address</div>
+                      <div className="stat-value truncate">
+                        {paymasterAddress || "N/A"}
+                      </div>
+                      <div className="stat-actions">
+                        <button
+                          className="btn btn-sm btn-ghost shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+                          onClick={() => handleCopyAddress(paymasterAddress)}
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    {currentPlan && (
+                      <div className="mb-4">
+                        <h3 className="text-xl font-semibold mb-2">
+                          Current Subscription
+                        </h3>
+                        <div className="flex flex-col space-y-1">
+                          <p>
+                            <span className="font-semibold">Plan:</span>{" "}
+                            {currentPlan.name}
+                          </p>
+                          <p>
+                            <span className="font-semibold">Fee:</span> $
+                            {currentPlan.feeUSD} per month
+                            <span className="text-gray-500">
+                              {" "}
+                              (Equivalent to {currentPlan.feeETH} ETH using
+                              Chainlink price feeds)
+                            </span>
+                          </p>
+                          <p>
+                            <span className="font-semibold">Next Payment:</span>{" "}
+                            {currentPlan.nextPaymentTimestamp}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {isPaymasterEnabled ? (
+                      <div className="alert alert-success">
+                        <div className="flex items-center">
+                          <CheckCircle className="w-6 h-6 mr-2" />
+                          <span>
+                            <strong>Notice:</strong> The paymaster covers gas
+                            fees <strong>only</strong> for transactions
+                            interacting with the Subscription Manager contract.
+                            Users must cover fees for all other transactions,
+                            including subscription costs.
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="alert alert-error">
+                        <div className="flex items-start">
+                          <XCircle className="w-6 h-6 mr-2" />
+                          <span>
+                            <strong>Alert:</strong> The subscription owner does
+                            not sponsor transactions. Please fund the
+                            subscription smart wallet account to perform
+                            transactions.
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <button
+                        className="btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+                        onClick={() => setShowFundingModal(true)}
+                      >
+                        Fund Wallet
+                      </button>
+                      <button
+                        className="btn btn-secondary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+                        onClick={() => setShowSpendingLimitModal(true)}
+                      >
+                        Set Spending Limit
+                      </button>
+                      <button
+                        className="btn btn-secondary md:col-span-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+                        onClick={() => setShowUpdateSpendingLimitModal(true)}
+                      >
+                        Update Spending Limit
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </>
             ) : (
               <div>
-                <p className="mb-4">
-                  No subscription account found. Please deploy a new
-                  subscription account.
-                </p>
+                <div className="alert alert-info mb-4">
+                  <div className="flex items-center">
+                    <AlertCircle className="w-6 h-6 mr-2" />
+                    <div>
+                      <p className="font-bold">No Subscription Account Found</p>
+                      <p>Please deploy a new subscription account.</p>
+                      <p>
+                        Your smart account will automatically be charged at the
+                        end of each month.
+                      </p>
+                      <p>
+                        You will be charged each month based on your subscribed
+                        plan.
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 <button
-                  className="btn btn-primary"
+                  className="btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
                   onClick={() => setShowDeployModal(true)}
                 >
-                  Deploy Subscription Account
+                  Deploy Subscription Smart Wallet
                 </button>
               </div>
             )}
@@ -654,84 +559,30 @@ function SubscriptionPage() {
             {plans.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {plans.map((plan) => (
-                  <div
-                    key={plan.id}
-                    className={`card bg-base-100 border border-base-300 rounded-lg ${
-                      selectedPlan?.id === plan.id
-                        ? "border-primary"
-                        : "cursor-pointer hover:border-primary"
-                    }`}
-                    onClick={() => setSelectedPlan(plan)}
-                  >
-                    <div className="card-body">
-                      <h3 className="card-title text-primary">{plan.name}</h3>
-                      <div className="flex flex-col space-y-4 mt-4">
-                        <div className="flex-1">
-                          <div className="text-gray-700">
-                            <div className="text-sm font-medium">Fee (USD)</div>
-                            <div className="text-lg font-semibold">
-                              ${plan.feeUSD} per month
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {plan.feeETH} ETH (converted using Chainlink price
-                              feeds)
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-gray-700">
-                            <div className="text-sm font-medium">
-                              Subscribers
-                            </div>
-                            <div className="text-lg font-semibold">
-                              {plan.subscriberCount}{" "}
-                              {plan.subscriberCount === 1
-                                ? "subscriber"
-                                : "subscribers"}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <UserFacingPlanCard
+                    key={plan.planId}
+                    plan={plan}
+                    subscriptionManager={subscriptionManager!}
+                    subscriptionAccount={subscriptionAccount}
+                    onPlanUpdated={async () => {
+                      await fetchPlans(
+                        subscriptionManager!,
+                        subscriptionAccountAddress
+                      );
+                      const provider = getProvider();
+                      const balance = await fetchSubscriptionAccountBalance(
+                        provider!,
+                        subscriptionAccountAddress!
+                      );
+                      setSubscriptionAccountBalance(balance);
+                    }}
+                  />
                 ))}
               </div>
             ) : (
               <p>No live plans available.</p>
             )}
           </div>
-
-          {selectedPlan && subscriptionAccount && (
-            <div className="bg-base-100 border border-base-300 rounded-lg p-6 mb-8">
-              <h2 className="text-2xl font-semibold mb-4">
-                Selected Plan: {selectedPlan.name}
-              </h2>
-
-              <div className="flex flex-col space-y-4">
-                <button
-                  className={`btn btn-primary`}
-                  onClick={subscribe}
-                  disabled={isSubscribing || !selectedPlan}
-                >
-                  Subscribe
-                </button>
-                <button
-                  className={`btn btn-primary`}
-                  onClick={unsubscribe}
-                  disabled={isUnsubscribing}
-                >
-                  Unsubscribe
-                </button>
-                <button
-                  className={`btn btn-primary`}
-                  onClick={startSubscription}
-                  disabled={isStartingSubscription}
-                >
-                  Start Subscription
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -745,17 +596,24 @@ function SubscriptionPage() {
         </p>
         <div className="flex justify-end">
           <button
-            className="btn mr-2"
+            className="btn mr-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
             onClick={() => setShowDeployModal(false)}
           >
             Cancel
           </button>
           <button
-            className={`btn btn-primary`}
+            className={`btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]`}
             onClick={deploySubscriptionAccount}
             disabled={isDeploying}
           >
-            Deploy
+            {isDeploying ? (
+              <div className="flex items-center justify-center">
+                <BeatLoader size={8} color="#FFFFFF" />
+                <span className="ml-2">Deploying...</span>
+              </div>
+            ) : (
+              "Deploy Smart Wallet"
+            )}
           </button>
         </div>
       </Modal>
@@ -780,17 +638,66 @@ function SubscriptionPage() {
         </div>
         <div className="flex justify-end">
           <button
-            className="btn mr-2"
+            className="btn mr-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
             onClick={() => setShowSpendingLimitModal(false)}
           >
             Cancel
           </button>
           <button
-            className={`btn btn-primary`}
+            className={`btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]`}
             onClick={setSpendingLimit}
             disabled={isSettingSpendingLimit}
           >
-            Set Limit
+            {isSettingSpendingLimit ? (
+              <div className="flex items-center justify-center">
+                <BeatLoader size={8} color="#FFFFFF" />
+                <span className="ml-2">Setting Limit...</span>
+              </div>
+            ) : (
+              "Set Limit"
+            )}
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showFundingModal}
+        onClose={() => setShowFundingModal(false)}
+        title="Fund Wallet"
+      >
+        <div className="form-control mb-4">
+          <label className="label">
+            <span className="label-text">Funding Amount (ETH)</span>
+          </label>
+          <input
+            type="number"
+            step="0.0001"
+            className="input input-bordered"
+            value={fundingAmount}
+            onChange={(e) => setFundingAmount(e.target.value)}
+            placeholder="Enter funding amount"
+          />
+        </div>
+        <div className="flex justify-end">
+          <button
+            className="btn mr-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+            onClick={() => setShowFundingModal(false)}
+          >
+            Cancel
+          </button>
+          <button
+            className={`btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]`}
+            onClick={handleFundWallet}
+            disabled={isFunding}
+          >
+            {isFunding ? (
+              <div className="flex items-center justify-center">
+                <BeatLoader size={8} color="#FFFFFF" />
+                <span className="ml-2">Funding...</span>
+              </div>
+            ) : (
+              "Fund"
+            )}
           </button>
         </div>
       </Modal>
@@ -815,17 +722,24 @@ function SubscriptionPage() {
         </div>
         <div className="flex justify-end">
           <button
-            className="btn mr-2"
+            className="btn mr-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
             onClick={() => setShowUpdateSpendingLimitModal(false)}
           >
             Cancel
           </button>
           <button
-            className={`btn btn-primary`}
+            className={`btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]`}
             onClick={updateSpendingLimit}
             disabled={isUpdatingSpendingLimit}
           >
-            Update Limit
+            {isUpdatingSpendingLimit ? (
+              <div className="flex items-center justify-center">
+                <BeatLoader size={8} color="#FFFFFF" />
+                <span className="ml-2">Updating Limit...</span>
+              </div>
+            ) : (
+              "Update Limit"
+            )}
           </button>
         </div>
       </Modal>

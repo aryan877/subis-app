@@ -97,8 +97,8 @@ function SubscriptionManagerDetails() {
     try {
       const allPlans: Plan[] = await subscriptionManager.getAllPlans();
       const updatedPlans: Plan[] = await Promise.all(
-        allPlans.map(async (plan, index) => ({
-          id: index,
+        allPlans.map(async (plan) => ({
+          planId: plan.planId,
           name: plan.name,
           feeUSD: ethers.formatUnits(plan.feeUSD, 8),
           feeETH: parseFloat(
@@ -110,7 +110,7 @@ function SubscriptionManagerDetails() {
           exists: plan.exists,
           isLive: plan.isLive,
           subscriberCount: Number(
-            await subscriptionManager.getSubscriberCount(index)
+            await subscriptionManager.getSubscriberCount(plan.planId)
           ),
         }))
       );
@@ -291,15 +291,17 @@ function SubscriptionManagerDetails() {
 
   return (
     <div className="flex flex-col items-center justify-center py-8">
-      <BackButton />
-      <h1 className="text-4xl font-bold mb-8">Subscription Manager Details</h1>
+      <h1 className="text-4xl font-bold mb-8">
+        Subscription Manager Dashboard
+      </h1>
       {isLoading ? (
         <div className="flex justify-center items-center h-64">
           <BeatLoader size={12} color="#4B5563" />
         </div>
       ) : subscriptionManager ? (
-        <div className="w-full max-w-6xl px-4">
-          <div className="bg-white border border-gray-300 rounded-lg p-6 mb-8">
+        <div className="w-full max-w-7xl px-4">
+          <BackButton />
+          <div className="bg-white border border-gray-300 rounded-lg p-6 mb-8 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="flex flex-col items-start">
                 <div className="text-lg font-semibold text-gray-700">
@@ -308,7 +310,7 @@ function SubscriptionManagerDetails() {
                 <div className="text-gray-600 break-all flex items-center">
                   {address}
                   <button
-                    className={`btn btn-ghost btn-xs ml-2 ${
+                    className={`btn btn-ghost btn-xs ml-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000] ${
                       copyStatus[address]
                         ? "bg-success text-success-content"
                         : ""
@@ -331,7 +333,7 @@ function SubscriptionManagerDetails() {
                 <div className="text-gray-600 break-all flex items-center">
                   {owner}
                   <button
-                    className={`btn btn-ghost btn-xs ml-2 ${
+                    className={`btn btn-ghost btn-xs ml-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000] ${
                       copyStatus[owner] ? "bg-success text-success-content" : ""
                     }`}
                     onClick={() => handleCopyAddress(owner)}
@@ -348,7 +350,7 @@ function SubscriptionManagerDetails() {
                   <div className="text-gray-600 break-all flex items-center">
                     {paymaster}
                     <button
-                      className={`btn btn-ghost btn-xs ml-2 ${
+                      className={`btn btn-ghost btn-xs ml-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000] ${
                         copyStatus[paymaster]
                           ? "bg-success text-success-content"
                           : ""
@@ -401,14 +403,14 @@ function SubscriptionManagerDetails() {
               {owner.toLowerCase() === signerAddress?.toLowerCase() && (
                 <>
                   <button
-                    className="btn btn-accent"
+                    className="btn btn-accent shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
                     onClick={() => setShowWithdrawModal(true)}
                   >
                     Withdraw
                   </button>
                   {paymaster !== ethers.ZeroAddress && (
                     <button
-                      className="btn btn-primary"
+                      className="btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
                       onClick={openFundPaymasterModal}
                     >
                       <CreditCard className="w-4 h-4 mr-2" />
@@ -418,7 +420,7 @@ function SubscriptionManagerDetails() {
                   {subscriptionManager && (
                     <div>
                       <button
-                        className="btn btn-accent"
+                        className="btn btn-accent shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
                         onClick={copySubscriptionLink}
                       >
                         <Copy className="w-4 h-4 mr-2" />
@@ -430,12 +432,12 @@ function SubscriptionManagerDetails() {
               )}
             </div>
           </div>
-          <div className="bg-base-100 border border-base-300 rounded-lg p-6 mb-8">
+          <div className="bg-base-100 border border-base-300 rounded-lg p-6 mb-8 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]">
             <div className="flex justify-between items-center mb-8">
               <h2 className="text-2xl font-semibold">All Subscription Plans</h2>
               {owner.toLowerCase() === signerAddress?.toLowerCase() && (
                 <button
-                  className="btn btn-primary btn-sm"
+                  className="btn btn-primary btn-sm shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
                   onClick={() => setShowCreatePlanModal(true)}
                 >
                   <PlusCircle className="w-4 h-4 mr-2" />
@@ -447,7 +449,7 @@ function SubscriptionManagerDetails() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {plans.map((plan) => (
                   <PlanCard
-                    key={plan.id}
+                    key={plan.planId}
                     plan={plan}
                     subscriptionManagerAddress={address}
                     onPlanUpdated={fetchPlans}
@@ -492,13 +494,13 @@ function SubscriptionManagerDetails() {
         </div>
         <div className="flex justify-end">
           <button
-            className="btn mr-2"
+            className="btn mr-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
             onClick={() => setShowCreatePlanModal(false)}
           >
             Cancel
           </button>
           <button
-            className={`btn btn-primary`}
+            className={`btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]`}
             onClick={createPlan}
             disabled={isCreatingPlan}
           >
@@ -539,13 +541,13 @@ function SubscriptionManagerDetails() {
         </div>
         <div className="flex justify-end">
           <button
-            className="btn mr-2"
+            className="btn mr-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
             onClick={() => setShowWithdrawModal(false)}
           >
             Cancel
           </button>
           <button
-            className={`btn btn-accent`}
+            className={`btn btn-accent shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]`}
             onClick={withdraw}
             disabled={isWithdrawing}
           >
@@ -593,11 +595,14 @@ function SubscriptionManagerDetails() {
           </p>
         )}
         <div className="flex justify-end">
-          <button className="btn mr-2" onClick={closeFundPaymasterModal}>
+          <button
+            className="btn mr-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+            onClick={closeFundPaymasterModal}
+          >
             Cancel
           </button>
           <button
-            className={`btn btn-primary`}
+            className={`btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]`}
             onClick={handleFundPaymaster}
             disabled={isFundingPaymaster}
           >

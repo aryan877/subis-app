@@ -192,7 +192,7 @@ function CreateManager() {
       <h1 className="text-4xl font-bold mb-6 text-center text-primary">
         Deploy Subscription Manager
       </h1>
-      <div className="w-full max-w-xl bg-base-100 border border-base-300 rounded-lg p-6">
+      <div className="w-full max-w-xl bg-base-100 border border-base-300 rounded-lg p-6 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]">
         <div className="mb-8">
           <p className="text-lg mb-2 text-primary flex items-center">
             <span className="mr-2">
@@ -208,7 +208,7 @@ function CreateManager() {
             started.
           </p>
           <button
-            className="btn btn-primary w-full"
+            className="btn btn-primary w-full shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
             onClick={deploySubscriptionManager}
             disabled={inProgress}
           >
@@ -246,7 +246,7 @@ function CreateManager() {
               to enhance the user experience.
             </p>
             <button
-              className="btn btn-accent w-full"
+              className="btn btn-accent w-full shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
               onClick={deployPaymaster}
               disabled={paymasterInProgress || paymasterDeployed}
             >
@@ -286,7 +286,7 @@ function CreateManager() {
                   address.
                 </p>
                 <button
-                  className="btn btn-secondary w-full"
+                  className="btn btn-secondary w-full shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
                   onClick={updatePaymaster}
                   disabled={updatingPaymaster}
                 >
@@ -305,7 +305,10 @@ function CreateManager() {
         )}
         {isAllStepsCompleted && (
           <div className="mt-8">
-            <Link href="/my-managers" className="btn btn-primary w-full">
+            <Link
+              href="/my-managers"
+              className="btn btn-primary w-full shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+            >
               View Managers
             </Link>
           </div>
@@ -320,7 +323,7 @@ function CreateManager() {
         )}
         {error && (
           <div className="alert alert-error shadow-lg mt-4">
-            <div>
+            <div className="flex items-center gap-4">
               <AlertTriangle className="stroke-current flex-shrink-0 h-6 w-6" />
               <span>{error}</span>
             </div>

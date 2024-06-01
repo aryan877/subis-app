@@ -28,6 +28,7 @@ function MyManagers() {
   const { getSigner, getProvider } = useEthereum();
   const router = useRouter();
   const { showToast } = useToast();
+
   useEffect(() => {
     const fetchManagers = async () => {
       setIsLoading(true);
@@ -154,102 +155,126 @@ function MyManagers() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center py-2">
-      <BackButton />
-      <h1 className="text-3xl font-bold mb-6">My Subscription Managers</h1>
+    <div className="flex flex-col items-center justify-center py-2 w-full max-w-7xl mx-auto">
+      <div className="flex justify-between items-center w-full mb-6">
+        <BackButton />
+        <h1 className="text-3xl font-bold">My Subscription Managers</h1>
+        <div className="w-12"></div>
+      </div>
+
       {isLoading ? (
         <div>
           <span className="loading loading-dots loading-md"></span>
           <p>Loading subscription managers...</p>
         </div>
       ) : managers.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {managers.map((manager, index) => (
-            <div
-              key={index}
-              className="card bg-base-100 border border-base-300 rounded-lg"
+        <div className="w-full">
+          <div className="flex justify-end mb-6">
+            <button
+              onClick={() => router.push("/create-manager")}
+              className="btn btn-secondary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
             >
-              <div className="card-body">
-                <h2 className="card-title">
-                  Manager {index + 1}
-                  <div className="badge badge-secondary ml-2">
-                    {planCounts[manager] || 0} Plans
-                  </div>
-                </h2>
-                <p className="mb-2 flex items-center">
-                  <span className="font-semibold mr-2">Address:</span>
-                  {manager.slice(0, 6)}...{manager.slice(-4)}
-                  <button
-                    className={`btn btn-ghost btn-xs ml-2 ${
-                      copyStatus[manager]
-                        ? "bg-success text-success-content"
-                        : ""
-                    }`}
-                    onClick={() => handleCopyAddress(manager)}
-                  >
-                    <Copy className="w-4 h-4" />
-                  </button>
-                </p>
-                <p className="mb-2 flex items-center">
-                  <span className="font-semibold mr-2">Paymaster:</span>
-                  {paymasterAddresses[manager] !== ethers.ZeroAddress
-                    ? `${paymasterAddresses[manager].slice(
-                        0,
-                        6
-                      )}...${paymasterAddresses[manager].slice(-4)}`
-                    : "No paymaster attached"}
-                  {paymasterAddresses[manager] !== ethers.ZeroAddress && (
+              Create New Manager
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {managers.map((manager, index) => (
+              <div
+                key={index}
+                className="card bg-base-100 border border-base-300 rounded-lg shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+              >
+                <div className="card-body">
+                  <h2 className="card-title">
+                    Manager {index + 1}
+                    <div className="badge badge-secondary ml-2">
+                      {planCounts[manager] || 0} Plans
+                    </div>
+                  </h2>
+                  <p className="mb-2 flex items-center">
+                    <span className="font-semibold mr-2">Address:</span>
+                    {manager.slice(0, 6)}...{manager.slice(-4)}
                     <button
-                      className={`btn btn-ghost btn-xs ml-2 ${
-                        copyStatus[paymasterAddresses[manager]]
+                      className={`btn btn-ghost btn-xs ml-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000] ${
+                        copyStatus[manager]
                           ? "bg-success text-success-content"
                           : ""
                       }`}
-                      onClick={() =>
-                        handleCopyAddress(paymasterAddresses[manager])
-                      }
+                      onClick={() => handleCopyAddress(manager)}
                     >
                       <Copy className="w-4 h-4" />
                     </button>
-                  )}
-                </p>
-                <p className="mb-4 flex items-center">
-                  <span className="font-semibold mr-2">Paymaster Balance:</span>
-                  {paymasterBalances[manager]
-                    ? `${paymasterBalances[manager]} ETH`
-                    : "N/A"}
-                </p>
-                <div className="card-actions justify-end">
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => openFundingModal(manager)}
-                    disabled={
-                      paymasterAddresses[manager] === ethers.ZeroAddress
-                    }
-                  >
-                    <CreditCard className="w-4 h-4 mr-2" />
-                    Fund Paymaster
-                  </button>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => router.push(`/managers/${manager}`)}
-                  >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    View Details
-                  </button>
+                  </p>
+                  <p className="mb-2 flex items-center">
+                    <span className="font-semibold mr-2">Paymaster:</span>
+                    {paymasterAddresses[manager] !== ethers.ZeroAddress
+                      ? `${paymasterAddresses[manager].slice(
+                          0,
+                          6
+                        )}...${paymasterAddresses[manager].slice(-4)}`
+                      : "No paymaster attached"}
+                    {paymasterAddresses[manager] !== ethers.ZeroAddress && (
+                      <button
+                        className={`btn btn-ghost btn-xs ml-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000] ${
+                          copyStatus[paymasterAddresses[manager]]
+                            ? "bg-success text-success-content"
+                            : ""
+                        }`}
+                        onClick={() =>
+                          handleCopyAddress(paymasterAddresses[manager])
+                        }
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    )}
+                  </p>
+                  <p className="mb-4 flex items-center">
+                    <span className="font-semibold mr-2">
+                      Paymaster Balance:
+                    </span>
+                    {paymasterBalances[manager]
+                      ? `${paymasterBalances[manager]} ETH`
+                      : "N/A"}
+                  </p>
+                  <div className="card-actions justify-end">
+                    <button
+                      className="btn btn-primary btn-sm shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+                      onClick={() => openFundingModal(manager)}
+                      disabled={
+                        paymasterAddresses[manager] === ethers.ZeroAddress
+                      }
+                    >
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Fund Paymaster
+                    </button>
+                    <button
+                      className="btn btn-secondary btn-sm shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+                      onClick={() => router.push(`/managers/${manager}`)}
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Dashboard
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       ) : (
-        <p>No Subscription Managers found.</p>
+        <div className="flex flex-col items-center">
+          <p className="mb-4">No Subscription Managers found.</p>
+          <button
+            onClick={() => router.push("/create-manager")}
+            className="btn btn-secondary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+          >
+            Create New Manager
+          </button>
+        </div>
       )}
 
       {/* Funding Modal */}
       {selectedManager && (
         <div className="modal modal-open">
-          <div className="modal-box">
+          <div className="modal-box shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]">
             <h3 className="font-bold text-lg">Fund Paymaster</h3>
             <p className="py-4">Enter the amount of ETH you want to fund:</p>
             <input
@@ -273,11 +298,14 @@ function MyManagers() {
               </p>
             )}
             <div className="modal-action">
-              <button className="btn" onClick={closeFundingModal}>
+              <button
+                className="btn shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+                onClick={closeFundingModal}
+              >
                 Cancel
               </button>
               <button
-                className={`btn btn-primary`}
+                className={`btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]`}
                 onClick={handleFundPaymaster}
                 disabled={fundingInProgress}
               >

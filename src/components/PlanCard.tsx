@@ -47,12 +47,12 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         signer
       );
 
-      const count = await subscriptionManager.getSubscriberCount(plan.id);
+      const count = await subscriptionManager.getSubscriberCount(plan.planId);
       setSubscriberCount(Number(count));
     };
 
     fetchSubscriberCount();
-  }, [getSigner, subscriptionManagerAddress, plan.id]);
+  }, [getSigner, subscriptionManagerAddress, plan.planId]);
 
   const updatePlan = async () => {
     try {
@@ -67,7 +67,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
 
       const feeUSD = ethers.parseUnits(updatedPlanFeeUSD, 8);
       const tx = await subscriptionManager.updatePlan(
-        plan.id,
+        plan.planId,
         updatedPlanName,
         feeUSD
       );
@@ -111,7 +111,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         signer
       );
 
-      const tx = await subscriptionManager.deletePlan(plan.id);
+      const tx = await subscriptionManager.deletePlan(plan.planId);
 
       showToast({
         type: "info",
@@ -152,7 +152,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         signer
       );
 
-      const tx = await subscriptionManager.makePlanLive(plan.id);
+      const tx = await subscriptionManager.makePlanLive(plan.planId);
 
       showToast({
         type: "info",
@@ -183,7 +183,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
   };
 
   return (
-    <div className="card bg-base-100 border border-base-300 rounded-lg">
+    <div className="card bg-base-100 border border-base-300 rounded-lg shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]">
       <div className="card-body">
         <h3 className="card-title text-primary">{plan.name}</h3>
         <div className="flex items-center space-x-2">
@@ -203,7 +203,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         </div>
         {!plan.isLive && (
           <button
-            className="btn btn-sm btn-success mt-2"
+            className="btn btn-sm btn-success mt-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
             onClick={() => setShowMakePlanLiveModal(true)}
           >
             <CheckCircle className="w-4 h-4 mr-2" />
@@ -235,14 +235,14 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         {!plan.isLive && (
           <div className="card-actions justify-end mt-6 space-x-2">
             <button
-              className="btn btn-sm btn-secondary"
+              className="btn btn-sm btn-secondary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
               onClick={() => setShowUpdatePlanModal(true)}
             >
               <Edit className="w-4 h-4 mr-2" />
               Edit
             </button>
             <button
-              className="btn btn-sm btn-error"
+              className="btn btn-sm btn-error shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
               onClick={() => setShowDeletePlanModal(true)}
             >
               <Trash2 className="w-4 h-4 mr-2" />
@@ -280,11 +280,14 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           />
         </div>
         <div className="modal-action">
-          <button className="btn" onClick={() => setShowUpdatePlanModal(false)}>
+          <button
+            className="btn shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+            onClick={() => setShowUpdatePlanModal(false)}
+          >
             Cancel
           </button>
           <button
-            className="btn btn-primary"
+            className="btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
             onClick={updatePlan}
             disabled={transactionInProgress}
           >
@@ -309,11 +312,14 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           Are you sure you want to delete the plan "{plan.name}"?
         </p>
         <div className="modal-action">
-          <button className="btn" onClick={() => setShowDeletePlanModal(false)}>
+          <button
+            className="btn shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+            onClick={() => setShowDeletePlanModal(false)}
+          >
             Cancel
           </button>
           <button
-            className="btn btn-error"
+            className="btn btn-error shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
             onClick={deletePlan}
             disabled={transactionInProgress}
           >
@@ -342,13 +348,13 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         </p>
         <div className="modal-action">
           <button
-            className="btn"
+            className="btn shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
             onClick={() => setShowMakePlanLiveModal(false)}
           >
             Cancel
           </button>
           <button
-            className="btn btn-success"
+            className="btn btn-success shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
             onClick={makePlanLive}
             disabled={transactionInProgress}
           >
