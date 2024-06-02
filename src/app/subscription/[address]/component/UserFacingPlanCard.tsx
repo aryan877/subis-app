@@ -43,30 +43,33 @@ const UserFacingPlanCard: React.FC<PlanCardProps> = ({
       setIsSubscribing(true);
       const signer = await getSigner();
       const provider = getProvider();
-      const subscriptionAccountAddress =
-        await subscriptionAccount!.getAddress();
 
       let subscribeTx =
         await subscriptionManager!.subscribe.populateTransaction(plan.planId);
       const paymaster = await subscriptionManager!.paymaster();
 
-      if (
-        paymaster !== ethers.ZeroAddress &&
-        isPaymasterBalanceSufficient(paymasterBalance)
-      ) {
-        const paymasterParams = utils.getPaymasterParams(paymaster, {
-          type: "General",
-          innerInput: new Uint8Array(),
-        });
+      const subscriptionAccountAddress =
+        await subscriptionAccount?.getAddress();
 
-        subscribeTx = {
-          ...subscribeTx,
-          customData: {
-            gasPerPubdata: utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
-            paymasterParams,
-          } as types.Eip712Meta,
-        };
-      }
+      subscribeTx = {
+        ...subscribeTx,
+        from: subscriptionAccountAddress,
+        chainId: (await provider!.getNetwork()).chainId,
+        nonce: await provider!.getTransactionCount(subscriptionAccountAddress!),
+        type: utils.EIP712_TX_TYPE,
+        value: ethers.getBigInt(0),
+        customData: {
+          gasPerPubdata: utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
+          ...(paymaster !== ethers.ZeroAddress &&
+            isPaymasterBalanceSufficient(paymasterBalance) && {
+              paymasterParams: utils.getPaymasterParams(paymaster, {
+                type: "General",
+                innerInput: new Uint8Array(),
+              }),
+            }),
+        } as types.Eip712Meta,
+      };
+
       subscribeTx.gasPrice = await provider!.getGasPrice();
       subscribeTx.gasLimit = await provider!.estimateGas(subscribeTx);
 
@@ -117,23 +120,28 @@ const UserFacingPlanCard: React.FC<PlanCardProps> = ({
         await subscriptionManager!.unsubscribe.populateTransaction();
       const paymaster = await subscriptionManager!.paymaster();
 
-      if (
-        paymaster !== ethers.ZeroAddress &&
-        isPaymasterBalanceSufficient(paymasterBalance)
-      ) {
-        const paymasterParams = utils.getPaymasterParams(paymaster, {
-          type: "General",
-          innerInput: new Uint8Array(),
-        });
+      const subscriptionAccountAddress =
+        await subscriptionAccount?.getAddress();
 
-        unsubscribeTx = {
-          ...unsubscribeTx,
-          customData: {
-            gasPerPubdata: utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
-            paymasterParams,
-          } as types.Eip712Meta,
-        };
-      }
+      unsubscribeTx = {
+        ...unsubscribeTx,
+        from: subscriptionAccountAddress,
+        chainId: (await provider!.getNetwork()).chainId,
+        nonce: await provider!.getTransactionCount(subscriptionAccountAddress!),
+        type: utils.EIP712_TX_TYPE,
+        value: ethers.getBigInt(0),
+        customData: {
+          gasPerPubdata: utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
+          ...(paymaster !== ethers.ZeroAddress &&
+            isPaymasterBalanceSufficient(paymasterBalance) && {
+              paymasterParams: utils.getPaymasterParams(paymaster, {
+                type: "General",
+                innerInput: new Uint8Array(),
+              }),
+            }),
+        } as types.Eip712Meta,
+      };
+
       unsubscribeTx.gasPrice = await provider.getGasPrice();
       unsubscribeTx.gasLimit = await provider.estimateGas(unsubscribeTx);
 

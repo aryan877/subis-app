@@ -129,7 +129,7 @@ function SubscriptionManagerDetails() {
         setBalance(ethers.formatEther(balance));
 
         const nextTimestamp = await subscriptionManager.nextChargeTimestamp();
-        setNextChargeTimestamp(nextTimestamp.toNumber());
+        setNextChargeTimestamp(Number(nextTimestamp));
 
         await fetchPlans(subscriptionManager);
         await fetchAdditionalDetails(subscriptionManager);
@@ -1054,7 +1054,7 @@ function SubscriptionManagerDetails() {
             placeholder="Enter withdrawal amount"
           />
           <label className="label">
-            <span className="label-text-alt text-warning">
+            <span className="label-text-alt text-red-500">
               Please ensure to leave some funds for gas to charge wallets.
             </span>
           </label>
@@ -1146,7 +1146,8 @@ function SubscriptionManagerDetails() {
         <div className="form-control mb-4">
           <label className="label">
             <span className="label-text">
-              Funding Amount (ETH), (it should be at least 0.01 ETH):
+              Funding Amount (ETH) (should be at least 0.01 ETH in order to
+              sponsor):
             </span>
           </label>
           <input
@@ -1250,7 +1251,7 @@ function SubscriptionManagerDetails() {
             placeholder="Enter withdrawal amount"
           />
           <label className="label">
-            <span className="label-text-alt text-warning">
+            <span className="label-text-alt text-red-500">
               Note: If you fail to maintain a minimum balance of 0.01 ETH for
               the paymaster, your users will have to pay for gas fees for all
               operations.

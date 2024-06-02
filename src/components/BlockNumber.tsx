@@ -1,8 +1,8 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
-import { useEthereum } from './Context';
+import { useEthereum } from "./Context";
 
 export function BlockNumber() {
   const { getProvider } = useEthereum();
@@ -24,9 +24,5 @@ export function BlockNumber() {
     };
   }, [getProvider]);
 
-  return (
-    <div>
-      {blockNumber?.toString()}
-    </div>
-  );
+  return <div>{blockNumber?.toString()}</div>;
 }

@@ -343,7 +343,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         <p className="text-base-content mb-4">
           Are you sure you want to make the plan "{plan.name}" live?
         </p>
-        <p className="text-warning bg-yellow-100 border border-yellow-500 p-3 rounded mb-4">
+        <p className="text-white bg-red-500 border border-red-700 p-3 rounded mb-4">
           Warning: Once a plan is made live, it cannot be edited or deleted.
         </p>
         <div className="modal-action">

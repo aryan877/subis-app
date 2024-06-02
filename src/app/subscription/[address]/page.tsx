@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { ethers } from "ethers";
-import { Contract, EIP712Signer, Wallet, utils } from "zksync-ethers";
+import { Contract, EIP712Signer, Wallet, types, utils } from "zksync-ethers";
 import { useEthereum } from "../../../components/Context";
 import SubscriptionManagerArtifact from "../../../../artifacts-zk/contracts/SubscriptionManager.sol/SubscriptionManager.json";
 import AAFactoryArtifact from "../../../../artifacts-zk/contracts/AAFactory.sol/AAFactory.json";
@@ -39,17 +39,18 @@ function SubscriptionPage() {
   const [isDeploying, setIsDeploying] = useState<boolean>(false);
   const [isSettingSpendingLimit, setIsSettingSpendingLimit] =
     useState<boolean>(false);
-  const [isUpdatingSpendingLimit, setIsUpdatingSpendingLimit] =
+  const [isRemovingSpendingLimit, setIsRemovingSpendingLimit] =
     useState<boolean>(false);
+  //form value
   const [spendingLimitAmount, setSpendingLimitAmount] = useState<string>("");
+  //on chain value
+  const [spendingLimitUSD, setSpendingLimitUSD] = useState<string>("0");
   const [signerAddress, setSignerAddress] = useState<string>("");
   const [isPaymasterEnabled, setIsPaymasterEnabled] = useState<boolean>(false);
   const [showFundingModal, setShowFundingModal] = useState<boolean>(false);
   const [fundingAmount, setFundingAmount] = useState<string>("");
   const [showDeployModal, setShowDeployModal] = useState<boolean>(false);
   const [showSpendingLimitModal, setShowSpendingLimitModal] =
-    useState<boolean>(false);
-  const [showUpdateSpendingLimitModal, setShowUpdateSpendingLimitModal] =
     useState<boolean>(false);
   const [subscriptionAccountBalance, setSubscriptionAccountBalance] =
     useState<string>("0");
@@ -67,6 +68,8 @@ function SubscriptionPage() {
   >([]);
 
   const { showToast } = useToast();
+  const [showWithdrawModal, setShowWithdrawModal] = useState<boolean>(false);
+  const [withdrawAmount, setWithdrawAmount] = useState<string>("");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -92,6 +95,7 @@ function SubscriptionPage() {
           const balance = await provider!.getBalance(paymaster);
           setPaymasterBalance(ethers.formatEther(balance));
         }
+
         const aaFactory = new Contract(
           process.env.NEXT_PUBLIC_AA_FACTORY_ADDRESS!,
           AAFactoryArtifact.abi,
@@ -102,7 +106,17 @@ function SubscriptionPage() {
             signerAddress,
             managerAddress
           );
-
+        if (subscriptionManager && subscriptionAccountAddress) {
+          await fetchPlans(subscriptionManager, subscriptionAccountAddress);
+          await fetchPaymentHistory(
+            subscriptionManager,
+            subscriptionAccountAddress
+          );
+          await fetchFailedPayments(
+            subscriptionManager,
+            subscriptionAccountAddress
+          );
+        }
         if (subscriptionAccountAddress !== ethers.ZeroAddress) {
           const subscriptionAccount = new Contract(
             subscriptionAccountAddress,
@@ -120,17 +134,12 @@ function SubscriptionPage() {
             address
           );
           setSubscriptionAccountBalance(balance);
-        }
-        if (subscriptionManager && subscriptionAccountAddress) {
-          await fetchPlans(subscriptionManager, subscriptionAccountAddress);
-          await fetchPaymentHistory(
-            subscriptionManager,
-            subscriptionAccountAddress
+
+          const limit = await subscriptionAccount.limits(
+            utils.L2_ETH_TOKEN_ADDRESS
           );
-          await fetchFailedPayments(
-            subscriptionManager,
-            subscriptionAccountAddress
-          );
+
+          setSpendingLimitUSD(ethers.formatUnits(limit[0], 8));
         }
 
         setIsLoading(false);
@@ -145,7 +154,7 @@ function SubscriptionPage() {
 
   const fetchPaymentHistory = async (
     subscriptionManager: Contract,
-    subscriptionAccountAddress: string
+    subscriptionAccountAddress: string | null
   ) => {
     try {
       const filter = subscriptionManager.filters.SubscriptionFeePaid(
@@ -172,7 +181,7 @@ function SubscriptionPage() {
 
   const fetchFailedPayments = async (
     subscriptionManager: Contract,
-    subscriptionAccountAddress: string
+    subscriptionAccountAddress: string | null
   ) => {
     try {
       const filter = subscriptionManager.filters.PaymentFailed(
@@ -267,6 +276,7 @@ function SubscriptionPage() {
         //@ts-ignore
         getProvider()
       );
+      const priceFeedAddress = process.env.NEXT_PUBLIC_PRICE_FEED_ADDRESS!;
       const aaFactory = new Contract(
         process.env.NEXT_PUBLIC_AA_FACTORY_ADDRESS!,
         AAFactoryArtifact.abi,
@@ -299,6 +309,7 @@ function SubscriptionPage() {
         salt,
         signerAddress,
         managerAddress,
+        priceFeedAddress,
         deploymentOptions
       );
 
@@ -392,6 +403,86 @@ function SubscriptionPage() {
     }
   };
 
+  const withdraw = async () => {
+    try {
+      const signer = await getSigner();
+      const provider = getProvider()!;
+
+      if (!withdrawAmount || isNaN(Number(withdrawAmount))) {
+        throw new Error("Invalid withdrawal amount");
+      }
+
+      let withdrawTx = await subscriptionAccount!.withdraw.populateTransaction(
+        ethers.parseEther(withdrawAmount)
+      );
+
+      const subscriptionAccountAddress =
+        await subscriptionAccount?.getAddress();
+
+      // const paymaster = await subscriptionManager!.paymaster();
+
+      withdrawTx = {
+        ...withdrawTx,
+        from: subscriptionAccountAddress,
+        chainId: (await provider!.getNetwork()).chainId,
+        nonce: await provider!.getTransactionCount(subscriptionAccountAddress!),
+        type: utils.EIP712_TX_TYPE,
+        customData: {
+          gasPerPubdata: utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
+          // ...(paymaster !== ethers.ZeroAddress &&
+          //   isPaymasterBalanceSufficient(paymasterBalance) && {
+          //     paymasterParams: utils.getPaymasterParams(paymaster, {
+          //       type: "General",
+          //       innerInput: new Uint8Array(),
+          //     }),
+          //   }),
+        } as types.Eip712Meta,
+      };
+
+      withdrawTx.gasPrice = await provider.getGasPrice();
+      withdrawTx.gasLimit = await provider.estimateGas(withdrawTx);
+
+      const eip712Signer = new EIP712Signer(
+        signer!,
+        Number(withdrawTx.chainId)
+      );
+      const signedTx = await eip712Signer.sign(withdrawTx);
+
+      withdrawTx.customData = {
+        ...withdrawTx.customData,
+        customSignature: signedTx,
+      };
+
+      showToast({ type: "info", message: "Withdrawing funds..." });
+
+      const sentTx = await provider.broadcastTransaction(
+        utils.serializeEip712(withdrawTx)
+      );
+      await sentTx.wait();
+
+      showToast({
+        type: "success",
+        message: "Funds withdrawn successfully!",
+        transactionHash: sentTx.hash,
+      });
+
+      setWithdrawAmount("");
+      setShowWithdrawModal(false);
+
+      const balance = await fetchSubscriptionAccountBalance(
+        provider!,
+        subscriptionAccountAddress!
+      );
+      setSubscriptionAccountBalance(balance);
+    } catch (error) {
+      console.error("Error withdrawing funds:", error);
+      showToast({
+        type: "error",
+        message: "Error withdrawing funds. Please try again.",
+      });
+    }
+  };
+
   useEffect(() => {
     const updateSubscriptionAccountBalanceUSD = async () => {
       if (subscriptionManager) {
@@ -414,28 +505,76 @@ function SubscriptionPage() {
     try {
       setIsSettingSpendingLimit(true);
       const signer = await getSigner();
-      const tx = await subscriptionAccount!.setSpendingLimit(
-        utils.L2_ETH_TOKEN_ADDRESS,
-        ethers.parseEther(spendingLimitAmount),
-        signer
+      const provider = getProvider()!;
+
+      if (!spendingLimitAmount || isNaN(Number(spendingLimitAmount))) {
+        throw new Error("Invalid spending limit amount");
+      }
+
+      let setLimitTx =
+        await subscriptionAccount!.setSpendingLimit.populateTransaction(
+          utils.L2_ETH_TOKEN_ADDRESS,
+          ethers.parseUnits(spendingLimitAmount, 8)
+        );
+
+      // const paymaster = await subscriptionManager!.paymaster();
+
+      const subscriptionAccountAddress =
+        await subscriptionAccount?.getAddress();
+
+      setLimitTx = {
+        ...setLimitTx,
+        from: subscriptionAccountAddress,
+        chainId: (await provider!.getNetwork()).chainId,
+        nonce: await provider!.getTransactionCount(subscriptionAccountAddress!),
+        type: utils.EIP712_TX_TYPE,
+        value: ethers.getBigInt(0),
+        customData: {
+          gasPerPubdata: utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
+          // ...(paymaster !== ethers.ZeroAddress &&
+          //   isPaymasterBalanceSufficient(paymasterBalance) && {
+          //     paymasterParams: utils.getPaymasterParams(paymaster, {
+          //       type: "General",
+          //       innerInput: new Uint8Array(),
+          //     }),
+          //   }),
+        } as types.Eip712Meta,
+      };
+
+      setLimitTx.gasPrice = await provider.getGasPrice();
+      setLimitTx.gasLimit = await provider.estimateGas(setLimitTx);
+
+      const eip712Signer = new EIP712Signer(
+        signer!,
+        Number(setLimitTx.chainId)
       );
+      const signedTx = await eip712Signer.sign(setLimitTx);
 
-      showToast({
-        type: "info",
-        message: "Setting spending limit...",
-        transactionHash: tx.hash,
-      });
+      setLimitTx.customData = {
+        ...setLimitTx.customData,
+        customSignature: signedTx,
+      };
 
-      await tx.wait();
+      showToast({ type: "info", message: "Setting spending limit..." });
+
+      const sentTx = await provider.broadcastTransaction(
+        utils.serializeEip712(setLimitTx)
+      );
+      await sentTx.wait();
 
       showToast({
         type: "success",
         message: "Spending limit set successfully!",
-        transactionHash: tx.hash,
+        transactionHash: sentTx.hash,
       });
 
       setSpendingLimitAmount("");
       setShowSpendingLimitModal(false);
+      const limit = await subscriptionAccount!.limits(
+        utils.L2_ETH_TOKEN_ADDRESS
+      );
+
+      setSpendingLimitUSD(ethers.formatUnits(limit[0], 8));
     } catch (error) {
       console.error("Error setting spending limit:", error);
       showToast({
@@ -447,40 +586,76 @@ function SubscriptionPage() {
     }
   };
 
-  const updateSpendingLimit = async () => {
+  const removeSpendingLimit = async () => {
     try {
-      setIsUpdatingSpendingLimit(true);
+      setIsRemovingSpendingLimit(true);
       const signer = await getSigner();
-      const tx = await subscriptionAccount!.setSpendingLimit(
-        utils.L2_ETH_TOKEN_ADDRESS,
-        ethers.parseEther(spendingLimitAmount),
-        signer
+      const provider = getProvider()!;
+
+      let removeLimitTx =
+        await subscriptionAccount!.removeSpendingLimit.populateTransaction(
+          utils.L2_ETH_TOKEN_ADDRESS
+        );
+      const paymaster = await subscriptionManager!.paymaster();
+
+      const subscriptionAccountAddress =
+        await subscriptionAccount?.getAddress();
+
+      removeLimitTx = {
+        ...removeLimitTx,
+        from: subscriptionAccountAddress,
+        chainId: (await provider!.getNetwork()).chainId,
+        nonce: await provider!.getTransactionCount(subscriptionAccountAddress!),
+        type: utils.EIP712_TX_TYPE,
+        value: ethers.getBigInt(0),
+        customData: {
+          gasPerPubdata: utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
+          // ...(paymaster !== ethers.ZeroAddress &&
+          //   isPaymasterBalanceSufficient(paymasterBalance) && {
+          //     paymasterParams: utils.getPaymasterParams(paymaster, {
+          //       type: "General",
+          //       innerInput: new Uint8Array(),
+          //     }),
+          //   }),
+        } as types.Eip712Meta,
+      };
+
+      removeLimitTx.gasPrice = await provider.getGasPrice();
+      removeLimitTx.gasLimit = await provider.estimateGas(removeLimitTx);
+
+      const eip712Signer = new EIP712Signer(
+        signer!,
+        Number(removeLimitTx.chainId)
       );
+      const signedTx = await eip712Signer.sign(removeLimitTx);
 
-      showToast({
-        type: "info",
-        message: "Updating spending limit...",
-        transactionHash: tx.hash,
-      });
+      removeLimitTx.customData = {
+        ...removeLimitTx.customData,
+        customSignature: signedTx,
+      };
 
-      await tx.wait();
+      showToast({ type: "info", message: "Removing spending limit..." });
+
+      const sentTx = await provider.broadcastTransaction(
+        utils.serializeEip712(removeLimitTx)
+      );
+      await sentTx.wait();
 
       showToast({
         type: "success",
-        message: "Spending limit updated successfully!",
-        transactionHash: tx.hash,
+        message: "Spending limit removed successfully!",
+        transactionHash: sentTx.hash,
       });
 
-      setSpendingLimitAmount("");
-      setShowUpdateSpendingLimitModal(false);
+      setSpendingLimitUSD("0");
     } catch (error) {
-      console.error("Error updating spending limit:", error);
+      console.error("Error removing spending limit:", error);
       showToast({
         type: "error",
-        message: "Error updating spending limit. Please try again.",
+        message: "Error removing spending limit. Please try again.",
       });
     } finally {
-      setIsUpdatingSpendingLimit(false);
+      setIsRemovingSpendingLimit(false);
     }
   };
 
@@ -549,6 +724,7 @@ function SubscriptionPage() {
                       <div className="stat-value truncate">
                         {paymasterAddress || "N/A"}
                       </div>
+
                       <div className="stat-actions">
                         <button
                           className="btn btn-sm btn-ghost shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
@@ -606,9 +782,12 @@ function SubscriptionPage() {
                             <span>
                               <strong>Notice:</strong> The paymaster covers gas
                               fees <strong>only</strong> for transactions
-                              interacting with the Subscription Manager
-                              contract. Users must cover fees for all other
-                              transactions, including subscription costs.
+                              directly interacting with the Subscription Manager
+                              contract, such as subscribing, unsubscribing, and
+                              resuming subscriptions etc. However, users are
+                              responsible for paying gas fees for all other
+                              transactions, including setting spending limits
+                              and funding the wallet with subscription fees.
                             </span>
                           </div>
                         </div>
@@ -646,18 +825,43 @@ function SubscriptionPage() {
                         Fund Wallet
                       </button>
                       <button
+                        className="btn btn-accent mt-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+                        onClick={() => setShowWithdrawModal(true)}
+                      >
+                        Withdraw Funds
+                      </button>
+                      <button
                         className="btn btn-secondary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
                         onClick={() => setShowSpendingLimitModal(true)}
                       >
-                        Set Spending Limit
+                        Set Daily Spending Limit
                       </button>
                       <button
-                        className="btn btn-secondary md:col-span-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
-                        onClick={() => setShowUpdateSpendingLimitModal(true)}
+                        className="btn btn-accent mt-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+                        onClick={removeSpendingLimit}
+                        disabled={isRemovingSpendingLimit}
                       >
-                        Update Spending Limit
+                        {isRemovingSpendingLimit ? (
+                          <div className="flex items-center justify-center">
+                            <BeatLoader size={8} color="#FFFFFF" />
+                            <span className="ml-2">Removing Limit...</span>
+                          </div>
+                        ) : (
+                          "Remove Spending Limit"
+                        )}
                       </button>
                     </div>
+                    {subscriptionAccount && spendingLimitUSD !== "0" && (
+                      <div className="mt-8 mb-4">
+                        <h3 className="text-xl font-semibold mb-2">
+                          Spending Limit
+                        </h3>
+                        <p>
+                          <span className="font-semibold">Limit:</span> $
+                          {spendingLimitUSD} per day
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </>
@@ -726,6 +930,14 @@ function SubscriptionPage() {
                     subscriptionAccount={subscriptionAccount}
                     onPlanUpdated={async () => {
                       await fetchPlans(
+                        subscriptionManager!,
+                        subscriptionAccountAddress
+                      );
+                      await fetchPaymentHistory(
+                        subscriptionManager!,
+                        subscriptionAccountAddress
+                      );
+                      await fetchFailedPayments(
                         subscriptionManager!,
                         subscriptionAccountAddress
                       );
@@ -889,6 +1101,11 @@ function SubscriptionPage() {
             onChange={(e) => setFundingAmount(e.target.value)}
             placeholder="Enter funding amount"
           />
+          <label className="label">
+            <span className="label-text-alt text-red-500">
+              Note: The funding amount is in ETH, not USD.
+            </span>
+          </label>
         </div>
         <div className="flex justify-end">
           <button
@@ -915,43 +1132,83 @@ function SubscriptionPage() {
       </Modal>
 
       <Modal
-        isOpen={showUpdateSpendingLimitModal}
-        onClose={() => setShowUpdateSpendingLimitModal(false)}
-        title="Update Spending Limit"
+        isOpen={showSpendingLimitModal}
+        onClose={() => setShowSpendingLimitModal(false)}
+        title="Set Spending Limit"
       >
         <div className="form-control mb-4">
           <label className="label">
-            <span className="label-text">New Spending Limit Amount (ETH)</span>
+            <span className="label-text">Spending Limit Amount (USD)</span>
           </label>
           <input
             type="number"
-            step="0.0001"
+            step="0.01"
             className="input input-bordered"
             value={spendingLimitAmount}
             onChange={(e) => setSpendingLimitAmount(e.target.value)}
-            placeholder="Enter new spending limit amount"
+            placeholder="Enter spending limit amount"
           />
+          <label className="label">
+            <span className="label-text-alt text-red-500">
+              Note: The spending limit cannot be updated for 24 hours after
+              setting it. Make sure to set a higher value than your subscription
+              to avoid payment failures.
+            </span>
+          </label>
         </div>
         <div className="flex justify-end">
           <button
             className="btn mr-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
-            onClick={() => setShowUpdateSpendingLimitModal(false)}
+            onClick={() => setShowSpendingLimitModal(false)}
           >
             Cancel
           </button>
           <button
             className={`btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]`}
-            onClick={updateSpendingLimit}
-            disabled={isUpdatingSpendingLimit}
+            onClick={setSpendingLimit}
+            disabled={isSettingSpendingLimit}
           >
-            {isUpdatingSpendingLimit ? (
+            {isSettingSpendingLimit ? (
               <div className="flex items-center justify-center">
                 <BeatLoader size={8} color="#FFFFFF" />
-                <span className="ml-2">Updating Limit...</span>
+                <span className="ml-2">Setting Limit...</span>
               </div>
             ) : (
-              "Update Limit"
+              "Set Limit"
             )}
+          </button>
+        </div>
+      </Modal>
+      <Modal
+        isOpen={showWithdrawModal}
+        onClose={() => setShowWithdrawModal(false)}
+        title="Withdraw Funds"
+      >
+        <div className="form-control mb-4">
+          <label className="label">
+            <span className="label-text">Withdrawal Amount (ETH)</span>
+          </label>
+          <input
+            type="number"
+            step="0.0001"
+            className="input input-bordered"
+            value={withdrawAmount}
+            onChange={(e) => setWithdrawAmount(e.target.value)}
+            placeholder="Enter withdrawal amount"
+          />
+        </div>
+        <div className="flex justify-end">
+          <button
+            className="btn mr-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+            onClick={() => setShowWithdrawModal(false)}
+          >
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+            onClick={withdraw}
+          >
+            Withdraw
           </button>
         </div>
       </Modal>

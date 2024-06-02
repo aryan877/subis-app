@@ -278,7 +278,8 @@ function MyManagers() {
             <h3 className="font-bold text-lg">Fund Paymaster</h3>
             <p className="py-4">
               {" "}
-              Funding Amount (ETH), (it should be at least 0.01 ETH):
+              Funding Amount (ETH) (should be at least 0.01 ETH in order to
+              sponsor):
             </p>
             <input
               type="number"
