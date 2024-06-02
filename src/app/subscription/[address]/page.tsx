@@ -23,8 +23,8 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 
 function SubscriptionPage() {
-  const params = useParams<{ address: string }>();
-  const managerAddress = params.address;
+  const params = useParams();
+  const managerAddress: string = params.address;
   const [managerName, setManagerName] = useState<string>("");
   const [subscriptionManager, setSubscriptionManager] =
     useState<Contract | null>(null);

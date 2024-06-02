@@ -22,9 +22,9 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 
 function SubscriptionManagerDetails() {
-  const params = useParams<{ address: string }>();
+  const params = useParams();
   const router = useRouter();
-  const address = params.address;
+  const address: string = params.address;
   const [subscriptionManager, setSubscriptionManager] =
     useState<Contract | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
