@@ -181,13 +181,13 @@ function MyManagers() {
             {managers.map((manager, index) => (
               <div
                 key={index}
-                className="card bg-base-100 border border-base-300 rounded-lg shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+                className="card bg-base-100 border border-black rounded-lg shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
               >
                 <div className="card-body">
                   <h2 className="card-title">
                     Manager {index + 1}
                     <div className="badge badge-secondary ml-2">
-                      {planCounts[manager] || 0} Plans
+                      {Number(planCounts[manager]) || 0} Plans
                     </div>
                   </h2>
                   <p className="mb-2 flex items-center">
@@ -276,7 +276,10 @@ function MyManagers() {
         <div className="modal modal-open">
           <div className="modal-box shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]">
             <h3 className="font-bold text-lg">Fund Paymaster</h3>
-            <p className="py-4">Enter the amount of ETH you want to fund:</p>
+            <p className="py-4">
+              {" "}
+              Funding Amount (ETH), (it should be at least 0.01 ETH):
+            </p>
             <input
               type="number"
               placeholder="Funding amount in ETH"

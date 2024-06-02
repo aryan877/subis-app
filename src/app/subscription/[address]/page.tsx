@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { ethers } from "ethers";
-import { Contract } from "zksync-ethers";
+import { Contract, EIP712Signer, Wallet, utils } from "zksync-ethers";
 import { useEthereum } from "../../../components/Context";
 import SubscriptionManagerArtifact from "../../../../artifacts-zk/contracts/SubscriptionManager.sol/SubscriptionManager.json";
 import AAFactoryArtifact from "../../../../artifacts-zk/contracts/AAFactory.sol/AAFactory.json";
@@ -12,17 +12,12 @@ import { BeatLoader } from "react-spinners";
 import { useToast } from "../../../context/ToastProvider";
 import { Plan } from "../../../../interfaces/Plan";
 import { Modal } from "../../../components/Modal";
-import {
-  AlertCircle,
-  CheckCircle,
-  Copy,
-  CreditCard,
-  XCircle,
-} from "lucide-react";
+import { AlertCircle, Copy, CreditCard, XCircle } from "lucide-react";
 import UserFacingPlanCard from "./component/UserFacingPlanCard";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
+import { isPaymasterBalanceSufficient } from "../../../utils/helpers";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -30,6 +25,7 @@ dayjs.extend(timezone);
 function SubscriptionPage() {
   const params = useParams<{ address: string }>();
   const managerAddress = params.address;
+  const [managerName, setManagerName] = useState<string>("");
   const [subscriptionManager, setSubscriptionManager] =
     useState<Contract | null>(null);
   const [subscriptionAccount, setSubscriptionAccount] =
@@ -62,6 +58,14 @@ function SubscriptionPage() {
   const { getSigner, getProvider } = useEthereum();
   const [subscriptionAccountBalanceUSD, setSubscriptionAccountBalanceUSD] =
     useState<string>("0");
+  const [paymentHistory, setPaymentHistory] = useState<
+    { planId: number; amount: string; timestamp: string }[]
+  >([]);
+  const [paymasterBalance, setPaymasterBalance] = useState<string>("0");
+  const [failedPayments, setFailedPayments] = useState<
+    { planId: number; amount: string; timestamp: string }[]
+  >([]);
+
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -77,10 +81,17 @@ function SubscriptionPage() {
           signer!
         );
         setSubscriptionManager(subscriptionManager);
+        const managerName = await subscriptionManager.name();
+        setManagerName(managerName);
 
         const paymaster = await subscriptionManager.paymaster();
         setIsPaymasterEnabled(paymaster !== ethers.ZeroAddress);
         setPaymasterAddress(paymaster);
+        if (paymaster !== ethers.ZeroAddress) {
+          const provider = getProvider();
+          const balance = await provider!.getBalance(paymaster);
+          setPaymasterBalance(ethers.formatEther(balance));
+        }
         const aaFactory = new Contract(
           process.env.NEXT_PUBLIC_AA_FACTORY_ADDRESS!,
           AAFactoryArtifact.abi,
@@ -110,8 +121,18 @@ function SubscriptionPage() {
           );
           setSubscriptionAccountBalance(balance);
         }
+        if (subscriptionManager && subscriptionAccountAddress) {
+          await fetchPlans(subscriptionManager, subscriptionAccountAddress);
+          await fetchPaymentHistory(
+            subscriptionManager,
+            subscriptionAccountAddress
+          );
+          await fetchFailedPayments(
+            subscriptionManager,
+            subscriptionAccountAddress
+          );
+        }
 
-        await fetchPlans(subscriptionManager, subscriptionAccountAddress);
         setIsLoading(false);
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -121,6 +142,60 @@ function SubscriptionPage() {
 
     fetchData();
   }, [managerAddress, getSigner]);
+
+  const fetchPaymentHistory = async (
+    subscriptionManager: Contract,
+    subscriptionAccountAddress: string
+  ) => {
+    try {
+      const filter = subscriptionManager.filters.SubscriptionFeePaid(
+        subscriptionAccountAddress
+      );
+      const events = await subscriptionManager.queryFilter(filter);
+
+      const history = events.map((event) => ({
+        //@ts-ignore
+        planId: Number(event.args.planId),
+        //@ts-ignore
+        amount: ethers.formatEther(event.args.amount),
+        //@ts-ignore
+        timestamp: dayjs(Number(event.args.timestamp) * 1000)
+          .local()
+          .format("MMMM D, YYYY h:mm:ss A"),
+      }));
+
+      setPaymentHistory(history);
+    } catch (error) {
+      console.error("Error fetching payment history:", error);
+    }
+  };
+
+  const fetchFailedPayments = async (
+    subscriptionManager: Contract,
+    subscriptionAccountAddress: string
+  ) => {
+    try {
+      const filter = subscriptionManager.filters.PaymentFailed(
+        subscriptionAccountAddress
+      );
+      const events = await subscriptionManager.queryFilter(filter);
+
+      const failedPaymentsData = events.map((event) => ({
+        //@ts-ignore
+        planId: Number(event.args.planId),
+        //@ts-ignore
+        amount: ethers.formatEther(event.args.subscriptionFeeWei),
+        //@ts-ignore
+        timestamp: dayjs(Number(event.args.timestamp) * 1000)
+          .local()
+          .format("MMMM D, YYYY h:mm:ss A"),
+      }));
+
+      setFailedPayments(failedPaymentsData);
+    } catch (error) {
+      console.error("Error fetching failed payments:", error);
+    }
+  };
 
   const fetchPlans = async (
     subscriptionManager: Contract,
@@ -187,16 +262,44 @@ function SubscriptionPage() {
     try {
       setIsDeploying(true);
       const signer = await getSigner();
+      const wallet = new Wallet(
+        ethers.Wallet.createRandom().privateKey,
+        //@ts-ignore
+        getProvider()
+      );
       const aaFactory = new Contract(
         process.env.NEXT_PUBLIC_AA_FACTORY_ADDRESS!,
         AAFactoryArtifact.abi,
-        signer!
+        wallet
       );
       const salt = ethers.id(signerAddress);
+      const deploymentOptions = {
+        customData: {
+          gasPerPubdata: utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
+        } as {
+          gasPerPubdata: number;
+        } & {
+          paymasterParams?: any;
+        },
+      };
+
+      if (
+        paymasterAddress !== ethers.ZeroAddress &&
+        isPaymasterBalanceSufficient(paymasterBalance)
+      ) {
+        const paymasterParams = utils.getPaymasterParams(paymasterAddress, {
+          type: "General",
+          innerInput: new Uint8Array(),
+        });
+
+        deploymentOptions.customData.paymasterParams = paymasterParams;
+      }
+
       const tx = await aaFactory.deployAccount(
         salt,
         signerAddress,
-        managerAddress
+        managerAddress,
+        deploymentOptions
       );
 
       showToast({
@@ -312,7 +415,7 @@ function SubscriptionPage() {
       setIsSettingSpendingLimit(true);
       const signer = await getSigner();
       const tx = await subscriptionAccount!.setSpendingLimit(
-        ethers.ZeroAddress,
+        utils.L2_ETH_TOKEN_ADDRESS,
         ethers.parseEther(spendingLimitAmount),
         signer
       );
@@ -349,7 +452,7 @@ function SubscriptionPage() {
       setIsUpdatingSpendingLimit(true);
       const signer = await getSigner();
       const tx = await subscriptionAccount!.setSpendingLimit(
-        ethers.ZeroAddress,
+        utils.L2_ETH_TOKEN_ADDRESS,
         ethers.parseEther(spendingLimitAmount),
         signer
       );
@@ -400,11 +503,18 @@ function SubscriptionPage() {
       ) : (
         <div className="w-full max-w-7xl px-4">
           <BackButton />
-          <div className="bg-white border border-gray-300 rounded-lg p-6 mb-8">
+          <div className="bg-white border border-black rounded-lg p-8 mb-8 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]">
+            <div className="mb-6">
+              <div className="text-lg font-semibold text-gray-700 mb-2">
+                Manager Name
+              </div>
+              <div className="text-gray-600">{managerName}</div>
+            </div>
             <h2 className="text-2xl font-semibold mb-4 flex items-center">
               <CreditCard className="w-6 h-6 mr-2" />
               Smart Wallet
             </h2>
+
             {subscriptionAccount ? (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -473,22 +583,48 @@ function SubscriptionPage() {
                             <span className="font-semibold">Next Payment:</span>{" "}
                             {currentPlan.nextPaymentTimestamp}
                           </p>
+                          <p className="flex items-center">
+                            <span className="font-semibold">
+                              Manager Address:
+                            </span>{" "}
+                            <span className="ml-1">{managerAddress}</span>
+                            <button
+                              className="btn btn-sm btn-ghost ml-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+                              onClick={() => handleCopyAddress(managerAddress)}
+                            >
+                              <Copy className="w-4 h-4" />
+                            </button>
+                          </p>
                         </div>
                       </div>
                     )}
                     {isPaymasterEnabled ? (
-                      <div className="alert alert-success">
-                        <div className="flex items-center">
-                          <CheckCircle className="w-6 h-6 mr-2" />
-                          <span>
-                            <strong>Notice:</strong> The paymaster covers gas
-                            fees <strong>only</strong> for transactions
-                            interacting with the Subscription Manager contract.
-                            Users must cover fees for all other transactions,
-                            including subscription costs.
-                          </span>
+                      paymasterBalance !== "0" &&
+                      isPaymasterBalanceSufficient(paymasterBalance) ? (
+                        <div className="alert alert-success">
+                          <div className="flex items-start">
+                            <span>
+                              <strong>Notice:</strong> The paymaster covers gas
+                              fees <strong>only</strong> for transactions
+                              interacting with the Subscription Manager
+                              contract. Users must cover fees for all other
+                              transactions, including subscription costs.
+                            </span>
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="alert alert-warning">
+                          <div className="flex items-start">
+                            <AlertCircle className="w-6 h-6 mr-2" />
+                            <span>
+                              <strong>Notice:</strong> The paymaster balance is
+                              low. Please inform the subscription owner to fund
+                              the paymaster. In the meantime, you will need to
+                              pay for your own transactions.
+                            </span>
+                          </div>
+                        </div>
+                      )
                     ) : (
                       <div className="alert alert-error">
                         <div className="flex items-start">
@@ -528,7 +664,7 @@ function SubscriptionPage() {
             ) : (
               <div>
                 <div className="alert alert-info mb-4">
-                  <div className="flex items-center">
+                  <div className="flex items-start">
                     <AlertCircle className="w-6 h-6 mr-2" />
                     <div>
                       <p className="font-bold">No Subscription Account Found</p>
@@ -541,6 +677,29 @@ function SubscriptionPage() {
                         You will be charged each month based on your subscribed
                         plan.
                       </p>
+                      {isPaymasterEnabled ? (
+                        paymasterBalance !== "0" &&
+                        isPaymasterBalanceSufficient(paymasterBalance) ? (
+                          <p>
+                            <strong>Note:</strong> The subscription owner
+                            sponsors the deployment of your subscription smart
+                            account. You can deploy your account gaslessly.
+                          </p>
+                        ) : (
+                          <p>
+                            <strong>Note:</strong> The paymaster balance is low.
+                            Please inform the subscription owner to fund the
+                            paymaster. In the meantime, you will need to pay for
+                            the deployment of your subscription smart account.
+                          </p>
+                        )
+                      ) : (
+                        <p>
+                          <strong>Note:</strong> The subscription owner does not
+                          sponsor transactions. You will need to pay for the
+                          deployment of your subscription smart account.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -554,7 +713,7 @@ function SubscriptionPage() {
             )}
           </div>
 
-          <div className="bg-white border border-gray-300 rounded-lg p-6 mb-8">
+          <div className="bg-white border border-black rounded-lg p-6 mb-8">
             <h2 className="text-2xl font-semibold mb-4">Live Plans</h2>
             {plans.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -562,6 +721,7 @@ function SubscriptionPage() {
                   <UserFacingPlanCard
                     key={plan.planId}
                     plan={plan}
+                    paymasterBalance={paymasterBalance}
                     subscriptionManager={subscriptionManager!}
                     subscriptionAccount={subscriptionAccount}
                     onPlanUpdated={async () => {
@@ -581,6 +741,58 @@ function SubscriptionPage() {
               </div>
             ) : (
               <p>No live plans available.</p>
+            )}
+          </div>
+
+          <div className="bg-white border border-black rounded-lg p-6 mb-8">
+            <h2 className="text-2xl font-semibold mb-4">Payment History</h2>
+            {paymentHistory.length > 0 ? (
+              <table className="table w-full">
+                <thead>
+                  <tr>
+                    <th>Plan ID</th>
+                    <th>Amount (ETH)</th>
+                    <th>Timestamp</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paymentHistory.map((payment, index) => (
+                    <tr key={index}>
+                      <td>{payment.planId}</td>
+                      <td>{payment.amount}</td>
+                      <td>{payment.timestamp}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p>No payment history available.</p>
+            )}
+          </div>
+
+          <div className="bg-white border border-black rounded-lg p-6 mb-8">
+            <h2 className="text-2xl font-semibold mb-4">Failed Payments</h2>
+            {failedPayments.length > 0 ? (
+              <table className="table w-full">
+                <thead>
+                  <tr>
+                    <th>Plan ID</th>
+                    <th>Amount (ETH)</th>
+                    <th>Timestamp</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {failedPayments.map((payment, index) => (
+                    <tr key={index}>
+                      <td>{payment.planId}</td>
+                      <td>{payment.amount}</td>
+                      <td>{payment.timestamp}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p>No failed payments found.</p>
             )}
           </div>
         </div>

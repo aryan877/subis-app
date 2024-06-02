@@ -6,7 +6,7 @@ import { useEthereum } from "./Context";
 
 export function Balance() {
   return (
-    <div className="card bg-base-100">
+    <div className="card bg-base-100 transition duration-300 ease-in-out">
       <div className="card-body">
         <h2 className="card-title">Balance</h2>
         <AccountBalance />
@@ -35,7 +35,7 @@ export function AccountBalance() {
       <p>
         Connected wallet balance: {balance ? ethers.formatEther(balance) : ""}
         <button
-          className="btn btn-sm btn-primary ml-2"
+          className="btn btn-sm btn-primary ml-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
           onClick={() => fetchBalance(account?.address)}
         >
           Refetch
@@ -76,7 +76,7 @@ export function FindBalance() {
             onChange={(e) => setAddress(e.target.value)}
           />
           <button
-            className="btn btn-primary"
+            className="btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
             onClick={() => fetchBalance(address)}
           >
             {inProgress ? "Fetching..." : "Fetch"}

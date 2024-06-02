@@ -8,9 +8,10 @@ import SubscriptionPaymasterArtifact from "../../../artifacts-zk/contracts/Subsc
 import { useRouter } from "next/navigation";
 import { utils, ContractFactory, Contract } from "zksync-ethers";
 import { BeatLoader } from "react-spinners";
-import { Check, AlertTriangle } from "lucide-react";
+import { Check, AlertTriangle, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { BackButton } from "../../components/BackButton";
+import { Modal } from "../../components/Modal";
 
 function CreateManager() {
   const [deployedAddress, setDeployedAddress] = useState<string | null>(null);
@@ -24,6 +25,8 @@ function CreateManager() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const { getSigner, getProvider } = useEthereum();
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [managerName, setManagerName] = useState("");
 
   useEffect(() => {
     const listenForManagerDeployed = async () => {
@@ -38,9 +41,13 @@ function CreateManager() {
           provider
         );
 
-        const handleManagerDeployed = (owner: string, manager: string) => {
+        const handleManagerDeployed = (
+          owner: string,
+          manager: string,
+          name: string
+        ) => {
           console.log(
-            `Manager deployed for owner ${owner} at address ${manager}`
+            `Manager deployed for owner ${owner} at address ${manager} with name ${name}`
           );
           setDeployedAddress(manager);
           setMessage("Subscription Manager deployed successfully!");
@@ -79,10 +86,12 @@ function CreateManager() {
       const tx = await factoryContract.deployManager(
         salt,
         ownerAddress,
-        priceFeedAddress
+        priceFeedAddress,
+        managerName
       );
       await tx.wait();
       console.log("Transaction completed, waiting for event...");
+      setShowNameModal(false);
     } catch (err) {
       console.error("Error deploying SubscriptionManager:", err);
       setError("Failed to deploy Subscription Manager. Please try again.");
@@ -104,18 +113,20 @@ function CreateManager() {
       const signer = await getSigner();
       const provider = getProvider();
 
-      console.log("Signer address:", signer?.address);
-
       const factory = new ContractFactory(
         SubscriptionPaymasterArtifact.abi,
         SubscriptionPaymasterArtifact.bytecode,
         signer
       );
 
-      const checksummedAddress = ethers.getAddress(deployedAddress);
+      const aaFactoryAddress = process.env.NEXT_PUBLIC_AA_FACTORY_ADDRESS;
+      if (!aaFactoryAddress) {
+        throw new Error("AA Factory address is not available.");
+      }
 
       const deploymentTransaction = await factory.getDeployTransaction(
-        checksummedAddress,
+        deployedAddress,
+        aaFactoryAddress,
         {
           customData: {
             gasPerPubdata: utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
@@ -126,13 +137,17 @@ function CreateManager() {
       const gasLimit = await signer!.estimateGas(deploymentTransaction);
       const gasPrice = await provider!.getGasPrice();
 
-      const paymaster = await factory.deploy(checksummedAddress, {
-        customData: {
-          gasPerPubdata: utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
-        },
-        gasPrice,
-        gasLimit,
-      });
+      const paymaster = await factory.deploy(
+        deployedAddress,
+        aaFactoryAddress,
+        {
+          customData: {
+            gasPerPubdata: utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
+          },
+          gasPrice,
+          gasLimit,
+        }
+      );
 
       await paymaster.waitForDeployment();
 
@@ -192,7 +207,7 @@ function CreateManager() {
       <h1 className="text-4xl font-bold mb-6 text-center text-primary">
         Deploy Subscription Manager
       </h1>
-      <div className="w-full max-w-xl bg-base-100 border border-base-300 rounded-lg p-6 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]">
+      <div className="w-full max-w-xl bg-base-100 border border-black rounded-lg p-6 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]">
         <div className="mb-8">
           <p className="text-lg mb-2 text-primary flex items-center">
             <span className="mr-2">
@@ -209,7 +224,7 @@ function CreateManager() {
           </p>
           <button
             className="btn btn-primary w-full shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
-            onClick={deploySubscriptionManager}
+            onClick={() => setShowNameModal(true)}
             disabled={inProgress}
           >
             {inProgress ? (
@@ -330,6 +345,64 @@ function CreateManager() {
           </div>
         )}
       </div>
+
+      <Modal
+        isOpen={showNameModal}
+        onClose={() => {
+          setShowNameModal(false);
+          setInProgress(false);
+        }}
+        title="Enter Manager Name"
+      >
+        <div className="form-control mb-4">
+          <label className="label">
+            <span className="label-text">Manager Name</span>
+          </label>
+          <input
+            type="text"
+            className="input input-bordered"
+            value={managerName}
+            onChange={(e) => setManagerName(e.target.value)}
+            placeholder="Enter manager name"
+            disabled={inProgress}
+          />
+        </div>
+        <div className="alert alert-warning mb-4">
+          <div className="items-start">
+            <AlertCircle className="w-6 h-6 mr-2 mb-2" />
+            <p>
+              Please note that the manager name will be visible to users who
+              subscribe and cannot be changed once the manager is deployed.
+            </p>
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <button
+            className="btn mr-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+            onClick={() => {
+              setShowNameModal(false);
+              setInProgress(false);
+            }}
+            disabled={inProgress}
+          >
+            Cancel
+          </button>
+          <button
+            className={`btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]`}
+            onClick={deploySubscriptionManager}
+            disabled={inProgress}
+          >
+            {inProgress ? (
+              <>
+                <BeatLoader size={8} color="#FFFFFF" />
+                <span className="ml-2">Deploying...</span>
+              </>
+            ) : (
+              "Deploy"
+            )}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

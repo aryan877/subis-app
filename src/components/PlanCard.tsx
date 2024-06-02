@@ -183,7 +183,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
   };
 
   return (
-    <div className="card bg-base-100 border border-base-300 rounded-lg shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]">
+    <div className="card bg-base-100 border border-black rounded-lg shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]">
       <div className="card-body">
         <h3 className="card-title text-primary">{plan.name}</h3>
         <div className="flex items-center space-x-2">

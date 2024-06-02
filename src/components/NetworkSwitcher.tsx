@@ -11,7 +11,7 @@ export function NetworkSwitcher() {
   } = useAsync(switchToChainByID);
 
   return (
-    <div className="card bg-base-100">
+    <div className="card bg-base-100 transition duration-300 ease-in-out">
       <div className="card-body">
         <h2 className="card-title">Network</h2>
         <p>
@@ -24,7 +24,7 @@ export function NetworkSwitcher() {
           {chains.map((item, index) => (
             <button
               key={index}
-              className="btn btn-primary"
+              className="btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
               onClick={() => switchNetwork(item.id)}
             >
               {item.name}

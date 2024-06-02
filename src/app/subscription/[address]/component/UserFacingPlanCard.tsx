@@ -6,11 +6,13 @@ import { types, EIP712Signer, utils } from "zksync-ethers";
 import { useEthereum } from "../../../../components/Context";
 import { ethers } from "ethers";
 import dayjs from "dayjs";
+import { isPaymasterBalanceSufficient } from "../../../../utils/helpers";
 
 interface PlanCardProps {
   plan: Plan;
   subscriptionManager: Contract;
   subscriptionAccount: Contract | null;
+  paymasterBalance: string;
   onPlanUpdated: () => Promise<void>;
 }
 
@@ -18,6 +20,7 @@ const UserFacingPlanCard: React.FC<PlanCardProps> = ({
   plan,
   subscriptionManager,
   subscriptionAccount,
+  paymasterBalance,
   onPlanUpdated,
 }) => {
   const [isSubscribing, setIsSubscribing] = useState<boolean>(false);
@@ -47,7 +50,10 @@ const UserFacingPlanCard: React.FC<PlanCardProps> = ({
         await subscriptionManager!.subscribe.populateTransaction(plan.planId);
       const paymaster = await subscriptionManager!.paymaster();
 
-      if (paymaster !== ethers.ZeroAddress) {
+      if (
+        paymaster !== ethers.ZeroAddress &&
+        isPaymasterBalanceSufficient(paymasterBalance)
+      ) {
         const paymasterParams = utils.getPaymasterParams(paymaster, {
           type: "General",
           innerInput: new Uint8Array(),
@@ -61,16 +67,6 @@ const UserFacingPlanCard: React.FC<PlanCardProps> = ({
           } as types.Eip712Meta,
         };
       }
-
-      subscribeTx = {
-        ...subscribeTx,
-        from: subscriptionAccountAddress,
-        chainId: (await provider!.getNetwork()).chainId,
-        nonce: await provider!.getTransactionCount(subscriptionAccountAddress),
-        type: utils.EIP712_TX_TYPE,
-        value: ethers.getBigInt(0),
-      };
-
       subscribeTx.gasPrice = await provider!.getGasPrice();
       subscribeTx.gasLimit = await provider!.estimateGas(subscribeTx);
 
@@ -121,7 +117,10 @@ const UserFacingPlanCard: React.FC<PlanCardProps> = ({
         await subscriptionManager!.unsubscribe.populateTransaction();
       const paymaster = await subscriptionManager!.paymaster();
 
-      if (paymaster !== ethers.ZeroAddress) {
+      if (
+        paymaster !== ethers.ZeroAddress &&
+        isPaymasterBalanceSufficient(paymasterBalance)
+      ) {
         const paymasterParams = utils.getPaymasterParams(paymaster, {
           type: "General",
           innerInput: new Uint8Array(),
@@ -135,18 +134,6 @@ const UserFacingPlanCard: React.FC<PlanCardProps> = ({
           } as types.Eip712Meta,
         };
       }
-
-      unsubscribeTx = {
-        ...unsubscribeTx,
-        from: await subscriptionAccount?.getAddress(),
-        chainId: (await provider.getNetwork()).chainId,
-        nonce: await provider.getTransactionCount(
-          await subscriptionAccount!.getAddress()
-        ),
-        type: utils.EIP712_TX_TYPE,
-        value: ethers.getBigInt(0),
-      };
-
       unsubscribeTx.gasPrice = await provider.getGasPrice();
       unsubscribeTx.gasLimit = await provider.estimateGas(unsubscribeTx);
 
@@ -187,9 +174,10 @@ const UserFacingPlanCard: React.FC<PlanCardProps> = ({
   };
 
   return (
-    <div className="card bg-base-100 border border-base-300 rounded-lg shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]">
+    <div className="card bg-base-100 border border-black rounded-lg shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]">
       <div className="card-body">
         <h3 className="card-title text-primary text-xl mb-4">{plan.name}</h3>
+        <p className="text-gray-500 text-sm">Plan ID: {Number(plan.planId)}</p>
         <div className="flex flex-col space-y-4">
           <div>
             <p className="text-gray-700 font-semibold mb-1">Subscription Fee</p>
@@ -221,7 +209,7 @@ const UserFacingPlanCard: React.FC<PlanCardProps> = ({
         <div className="card-actions justify-end mt-6">
           {isSubscriptionActive && (
             <button
-              className="btn btn-error shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+              className="btn btn-accent shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
               onClick={unsubscribe}
               disabled={isUnsubscribing}
             >
