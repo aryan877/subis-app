@@ -550,11 +550,14 @@ function SubscriptionManagerDetails() {
   const withdrawFromPaymaster = async () => {
     try {
       const signer = await getSigner();
-      const tx = await signer!.sendTransaction({
-        to: owner,
-        value: ethers.parseEther(withdrawalAmount),
-        from: paymaster,
-      });
+
+      const paymasterContract = new ethers.Contract(
+        paymaster,
+        SubscriptionPaymasterArtifact.abi,
+        signer
+      );
+
+      const tx = await paymasterContract.withdraw(owner);
 
       showToast({
         type: "info",
