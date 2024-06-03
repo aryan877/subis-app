@@ -11,7 +11,9 @@ import { BeatLoader } from "react-spinners";
 import { useToast } from "../../context/ToastProvider";
 
 function MyManagers() {
-  const [managers, setManagers] = useState<string[]>([]);
+  const [managers, setManagers] = useState<{ address: string; name: string }[]>(
+    []
+  );
   const [planCounts, setPlanCounts] = useState<{ [key: string]: number }>({});
   const [paymasterAddresses, setPaymasterAddresses] = useState<{
     [key: string]: string;
@@ -47,7 +49,25 @@ function MyManagers() {
         const managerAddresses = await factoryContract.getManagersByOwner(
           ownerAddress
         );
-        setManagers(managerAddresses);
+
+        const managerNames: string[] = await Promise.all(
+          managerAddresses.map(async (address: string) => {
+            const subscriptionManager = new ethers.Contract(
+              address,
+              SubscriptionManagerArtifact.abi,
+              signer
+            );
+            const name = await subscriptionManager.name();
+            return name;
+          })
+        );
+
+        setManagers(
+          managerAddresses.map((address: string, index: number) => ({
+            address,
+            name: managerNames[index],
+          }))
+        );
 
         const planCountsObj: { [key: string]: number } = {};
         const paymasterAddressesObj: { [key: string]: string } = {};
@@ -185,62 +205,67 @@ function MyManagers() {
               >
                 <div className="card-body">
                   <h2 className="card-title">
-                    Manager {index + 1}
+                    {manager.name}
                     <div className="badge badge-secondary ml-2">
-                      {Number(planCounts[manager]) || 0} Plans
+                      {Number(planCounts[manager.address]) || 0} Plans
                     </div>
                   </h2>
                   <p className="mb-2 flex items-center">
                     <span className="font-semibold mr-2">Address:</span>
-                    {manager.slice(0, 6)}...{manager.slice(-4)}
+                    {manager.address.slice(0, 6)}...
+                    {manager.address.slice(-4)}
                     <button
                       className={`btn btn-ghost btn-xs ml-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000] ${
-                        copyStatus[manager]
+                        copyStatus[manager.address]
                           ? "bg-success text-success-content"
                           : ""
                       }`}
-                      onClick={() => handleCopyAddress(manager)}
+                      onClick={() => handleCopyAddress(manager.address)}
                     >
                       <Copy className="w-4 h-4" />
                     </button>
                   </p>
                   <p className="mb-2 flex items-center">
                     <span className="font-semibold mr-2">Paymaster:</span>
-                    {paymasterAddresses[manager] !== ethers.ZeroAddress
-                      ? `${paymasterAddresses[manager].slice(
-                          0,
-                          6
-                        )}...${paymasterAddresses[manager].slice(-4)}`
-                      : "No paymaster attached"}
-                    {paymasterAddresses[manager] !== ethers.ZeroAddress && (
-                      <button
-                        className={`btn btn-ghost btn-xs ml-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000] ${
-                          copyStatus[paymasterAddresses[manager]]
-                            ? "bg-success text-success-content"
-                            : ""
-                        }`}
-                        onClick={() =>
-                          handleCopyAddress(paymasterAddresses[manager])
-                        }
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
+                    {paymasterAddresses[manager.address] !==
+                    ethers.ZeroAddress ? (
+                      <>
+                        {paymasterAddresses[manager.address].slice(0, 6)}...
+                        {paymasterAddresses[manager.address].slice(-4)}
+                        <button
+                          className={`btn btn-ghost btn-xs ml-2 shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000] ${
+                            copyStatus[paymasterAddresses[manager.address]]
+                              ? "bg-success text-success-content"
+                              : ""
+                          }`}
+                          onClick={() =>
+                            handleCopyAddress(
+                              paymasterAddresses[manager.address]
+                            )
+                          }
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </>
+                    ) : (
+                      "No paymaster attached"
                     )}
                   </p>
                   <p className="mb-4 flex items-center">
                     <span className="font-semibold mr-2">
                       Paymaster Balance:
                     </span>
-                    {paymasterBalances[manager]
-                      ? `${paymasterBalances[manager]} ETH`
+                    {paymasterBalances[manager.address]
+                      ? `${paymasterBalances[manager.address]} ETH`
                       : "N/A"}
                   </p>
                   <div className="card-actions justify-end">
                     <button
                       className="btn btn-primary btn-sm shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
-                      onClick={() => openFundingModal(manager)}
+                      onClick={() => openFundingModal(manager.address)}
                       disabled={
-                        paymasterAddresses[manager] === ethers.ZeroAddress
+                        paymasterAddresses[manager.address] ===
+                        ethers.ZeroAddress
                       }
                     >
                       <CreditCard className="w-4 h-4 mr-2" />
@@ -248,7 +273,9 @@ function MyManagers() {
                     </button>
                     <button
                       className="btn btn-secondary btn-sm shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
-                      onClick={() => router.push(`/managers/${manager}`)}
+                      onClick={() =>
+                        router.push(`/managers/${manager.address}`)
+                      }
                     >
                       <ExternalLink className="w-4 h-4 mr-2" />
                       Dashboard

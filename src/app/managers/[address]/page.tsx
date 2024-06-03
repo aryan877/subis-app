@@ -1160,17 +1160,19 @@ function SubscriptionManagerDetails() {
           />
         </div>
         {fundingTxHash && (
-          <p className="mb-4">
-            Transaction hash:{" "}
-            <a
-              href={`https://explorer.zksync.io/tx/${fundingTxHash}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="link"
-            >
-              {fundingTxHash}
-            </a>
-          </p>
+          <div className="mb-4">
+            <p>Transaction hash:</p>
+            <div className="break-all">
+              <a
+                href={`https://explorer.zksync.io/tx/${fundingTxHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="link"
+              >
+                {fundingTxHash}
+              </a>
+            </div>
+          </div>
         )}
         <div className="flex justify-end">
           <button
