@@ -867,52 +867,69 @@ function SubscriptionPage() {
               </>
             ) : (
               <div>
-                <div className="alert alert-info mb-4">
-                  <div className="flex items-start">
-                    <AlertCircle className="w-6 h-6 mr-2" />
-                    <div>
-                      <p className="font-bold">No Subscription Account Found</p>
-                      <p>Please deploy a new subscription account.</p>
-                      <p>
-                        Your smart account will automatically be charged at the
-                        end of each month.
-                      </p>
-                      <p>
-                        You will be charged each month based on your subscribed
-                        plan.
-                      </p>
-                      {isPaymasterEnabled ? (
-                        paymasterBalance !== "0" &&
-                        isPaymasterBalanceSufficient(paymasterBalance) ? (
-                          <p>
-                            <strong>Note:</strong> The subscription owner
-                            sponsors the deployment of your subscription smart
-                            account. You can deploy your account gaslessly.
-                          </p>
-                        ) : (
-                          <p>
-                            <strong>Note:</strong> The paymaster balance is low.
-                            Please inform the subscription owner to fund the
-                            paymaster. In the meantime, you will need to pay for
-                            the deployment of your subscription smart account.
-                          </p>
-                        )
+                <div
+                  className={`alert ${
+                    isPaymasterEnabled &&
+                    paymasterBalance !== "0" &&
+                    isPaymasterBalanceSufficient(paymasterBalance)
+                      ? "alert-info"
+                      : "alert-error"
+                  } mb-4`}
+                >
+                  <div className="flex flex-col items-start">
+                    {isPaymasterEnabled ? (
+                      paymasterBalance !== "0" &&
+                      isPaymasterBalanceSufficient(paymasterBalance) ? (
+                        <p>
+                          <strong>Note:</strong> The subscription owner sponsors
+                          the deployment of your subscription smart account. You
+                          can deploy your account gaslessly.
+                        </p>
                       ) : (
                         <p>
-                          <strong>Note:</strong> The subscription owner does not
-                          sponsor transactions. You will need to pay for the
-                          deployment of your subscription smart account.
+                          <strong>Note:</strong> The paymaster balance is low.
+                          Please inform the subscription owner to fund the
+                          paymaster. You cannot deploy an account with a low
+                          paymaster balance.
                         </p>
-                      )}
+                      )
+                    ) : (
+                      <p>
+                        <strong>Note:</strong> You cannot deploy an account
+                        without a paymaster. Please inform the subscription
+                        owner to create the paymaster.
+                      </p>
+                    )}
+
+                    <div className="flex mt-2">
+                      <AlertCircle className="w-6 h-6 mr-2" />
+                      <div>
+                        <p className="font-bold">
+                          No Subscription Account Found
+                        </p>
+                        <p>Please deploy a new subscription account.</p>
+                        <p>
+                          Your smart account will automatically be charged at
+                          the end of each month.
+                        </p>
+                        <p>
+                          You will be charged each month based on your
+                          subscribed plan.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <button
-                  className="btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
-                  onClick={() => setShowDeployModal(true)}
-                >
-                  Deploy Subscription Smart Wallet
-                </button>
+                {isPaymasterEnabled &&
+                  paymasterBalance !== "0" &&
+                  isPaymasterBalanceSufficient(paymasterBalance) && (
+                    <button
+                      className="btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+                      onClick={() => setShowDeployModal(true)}
+                    >
+                      Deploy Subscription Smart Wallet
+                    </button>
+                  )}
               </div>
             )}
           </div>
