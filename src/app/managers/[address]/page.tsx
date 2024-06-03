@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { ethers } from "ethers";
+import { Addressable, ethers } from "ethers";
 import { utils, ContractFactory, Contract } from "zksync-ethers";
 import { useEthereum } from "../../../components/Context";
 import SubscriptionManagerArtifact from "../../../../artifacts-zk/contracts/SubscriptionManager.sol/SubscriptionManager.json";
@@ -24,7 +24,7 @@ dayjs.extend(timezone);
 function SubscriptionManagerDetails() {
   const params = useParams();
   const router = useRouter();
-  const address: string = params.address;
+  const address = params.address as string;
   const [subscriptionManager, setSubscriptionManager] =
     useState<Contract | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -409,7 +409,7 @@ function SubscriptionManagerDetails() {
   const fetchUserSubscriptionPlan = async (address: string) => {
     try {
       const subscriptionManager = new ethers.Contract(
-        params.address,
+        address,
         SubscriptionManagerArtifact.abi,
         await getSigner()
       );

@@ -24,7 +24,7 @@ dayjs.extend(timezone);
 
 function SubscriptionPage() {
   const params = useParams();
-  const managerAddress: string = params.address;
+  const managerAddress = params.address as string;
   const [managerName, setManagerName] = useState<string>("");
   const [subscriptionManager, setSubscriptionManager] =
     useState<Contract | null>(null);
