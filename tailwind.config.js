@@ -59,9 +59,16 @@ module.exports = {
             color: "#000",
             "border-color": "#000",
           },
+          ".btn-warning": {
+            "border-color": "#000",
+          },
+          ".btn": {
+            "border-color": "#000",
+          },
         },
       },
     ],
   },
+
   plugins: [require("daisyui")],
 };

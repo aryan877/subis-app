@@ -271,11 +271,36 @@ function SubscriptionPage() {
     try {
       setIsDeploying(true);
       const signer = await getSigner();
-      const wallet = new Wallet(
-        ethers.Wallet.createRandom().privateKey,
-        //@ts-ignore
-        getProvider()
-      );
+      const signerAddress = await signer!.getAddress();
+
+      let wallet;
+      let deploymentOptions: any = undefined;
+
+      if (
+        paymasterAddress !== ethers.ZeroAddress &&
+        isPaymasterBalanceSufficient(paymasterBalance)
+      ) {
+        wallet = new Wallet(
+          ethers.Wallet.createRandom().privateKey,
+          //@ts-ignore
+          getProvider()
+        );
+
+        const paymasterParams = utils.getPaymasterParams(paymasterAddress, {
+          type: "General",
+          innerInput: new Uint8Array(),
+        });
+
+        deploymentOptions = {
+          customData: {
+            gasPerPubdata: utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
+            paymasterParams: paymasterParams,
+          },
+        };
+      } else {
+        wallet = signer;
+      }
+
       const priceFeedAddress = process.env.NEXT_PUBLIC_PRICE_FEED_ADDRESS!;
       const aaFactory = new Contract(
         process.env.NEXT_PUBLIC_AA_FACTORY_ADDRESS!,
@@ -283,35 +308,24 @@ function SubscriptionPage() {
         wallet
       );
       const salt = ethers.id(signerAddress);
-      const deploymentOptions = {
-        customData: {
-          gasPerPubdata: utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
-        } as {
-          gasPerPubdata: number;
-        } & {
-          paymasterParams?: any;
-        },
-      };
 
-      if (
-        paymasterAddress !== ethers.ZeroAddress &&
-        isPaymasterBalanceSufficient(paymasterBalance)
-      ) {
-        const paymasterParams = utils.getPaymasterParams(paymasterAddress, {
-          type: "General",
-          innerInput: new Uint8Array(),
-        });
-
-        deploymentOptions.customData.paymasterParams = paymasterParams;
+      let tx;
+      if (deploymentOptions) {
+        tx = await aaFactory.deployAccount(
+          salt,
+          signerAddress,
+          managerAddress,
+          priceFeedAddress,
+          deploymentOptions
+        );
+      } else {
+        tx = await aaFactory.deployAccount(
+          salt,
+          signerAddress,
+          managerAddress,
+          priceFeedAddress
+        );
       }
-
-      const tx = await aaFactory.deployAccount(
-        salt,
-        signerAddress,
-        managerAddress,
-        priceFeedAddress,
-        deploymentOptions
-      );
 
       showToast({
         type: "info",
@@ -329,7 +343,7 @@ function SubscriptionPage() {
       const subscriptionAccount = new Contract(
         subscriptionAccountAddress,
         SubscriptionAccountArtifact.abi,
-        signer!
+        signer
       );
       setSubscriptionAccount(subscriptionAccount);
 
@@ -876,60 +890,51 @@ function SubscriptionPage() {
                       : "alert-error"
                   } mb-4`}
                 >
-                  <div className="flex flex-col items-start">
-                    {isPaymasterEnabled ? (
-                      paymasterBalance !== "0" &&
-                      isPaymasterBalanceSufficient(paymasterBalance) ? (
-                        <p>
-                          <strong>Note:</strong> The subscription owner sponsors
-                          the deployment of your subscription smart account. You
-                          can deploy your account gaslessly.
-                        </p>
+                  <div className="flex items-start">
+                    <AlertCircle className="w-6 h-6 mr-2" />
+                    <div>
+                      <p className="font-bold">No Subscription Account Found</p>
+                      <p>Please deploy a new subscription account.</p>
+                      <p>
+                        Your smart account will automatically be charged at the
+                        end of each month.
+                      </p>
+                      <p>
+                        You will be charged each month based on your subscribed
+                        plan.
+                      </p>
+                      {isPaymasterEnabled ? (
+                        paymasterBalance !== "0" &&
+                        isPaymasterBalanceSufficient(paymasterBalance) ? (
+                          <p>
+                            <strong>Note:</strong> The subscription owner
+                            sponsors the deployment of your subscription smart
+                            account. You can deploy your account gaslessly.
+                          </p>
+                        ) : (
+                          <p>
+                            <strong>Note:</strong> The paymaster balance is low.
+                            Please inform the subscription owner to fund the
+                            paymaster. You will need to pay for the deployment
+                            of your subscription smart account.
+                          </p>
+                        )
                       ) : (
                         <p>
-                          <strong>Note:</strong> The paymaster balance is low.
-                          Please inform the subscription owner to fund the
-                          paymaster. You cannot deploy an account with a low
-                          paymaster balance.
+                          <strong>Note:</strong> The subscription owner does not
+                          sponsor transactions. You will need to pay for the
+                          deployment of your subscription smart account.
                         </p>
-                      )
-                    ) : (
-                      <p>
-                        <strong>Note:</strong> You cannot deploy an account
-                        without a paymaster. Please inform the subscription
-                        owner to create the paymaster.
-                      </p>
-                    )}
-
-                    <div className="flex mt-2">
-                      <AlertCircle className="w-6 h-6 mr-2" />
-                      <div>
-                        <p className="font-bold">
-                          No Subscription Account Found
-                        </p>
-                        <p>Please deploy a new subscription account.</p>
-                        <p>
-                          Your smart account will automatically be charged at
-                          the end of each month.
-                        </p>
-                        <p>
-                          You will be charged each month based on your
-                          subscribed plan.
-                        </p>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
-                {isPaymasterEnabled &&
-                  paymasterBalance !== "0" &&
-                  isPaymasterBalanceSufficient(paymasterBalance) && (
-                    <button
-                      className="btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
-                      onClick={() => setShowDeployModal(true)}
-                    >
-                      Deploy Subscription Smart Wallet
-                    </button>
-                  )}
+                <button
+                  className="btn btn-primary shadow-[6px_6px_0_0_#000] transition duration-300 ease-in-out hover:shadow-[8px_8px_0_0_#000]"
+                  onClick={() => setShowDeployModal(true)}
+                >
+                  Deploy Subscription Smart Wallet
+                </button>
               </div>
             )}
           </div>
